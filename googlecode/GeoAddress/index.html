@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link href='https://fonts.googleapis.com/css?family=Roboto:400,500' rel='stylesheet' type='text/css'>
+ <style>
+ 
+	
+ 	body{
+		background-color: #fafafa;
+		font-family: 'Roboto', sans-serif;
+	}
+	form {
+	display: inline-block;
+	margin-left: 25%;
+	margin-right: 25%;
+	width: 70%
+	}
+	
+	#submit{
+		color: #ffffff;
+		background-color: #03A9F4;
+		box-shadow: 0px 0px 20px black;
+		-webkit-border-radius: none;
+		-miz-border-radius: none;
+		border:none;
+		padding: 7px;
+		font-family: 'Roboto', sans-serif;
+		}
+	#submit:hover{
+		background-color: #23d0e5;
+				box-shadow: 0px 0px 50px black;
+
+		
+	}
+	#dav{
+		width: 50%;
+		margin: 0 auto;
+		background-color: #9C27B0;
+		color: #ffffff;
+		padding: 2%;
+		box-shadow: 0px 0px 9px gray;
+		font-family: 'Roboto', sans-serif;
+	
+	
+		
+	}
+	#inf{
+		width: 50%;
+		margin: 0 auto;
+		background-color: #ffffff;
+		color: black;
+		padding: 2%;
+		box-shadow: 0px 0px 9px gray;
+		font-family: 'Roboto', sans-serif;
+		}
+		
+	#imgs{
+		display:block;
+		margin-left:auto;
+		margin-right:auto;
+		padding: 10px;
+	}
+	
+	
+
+ </style>
+	
+</head>
+<body style:"background-color: #e0e0e0">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<div id="dav">
+<form id="form"> 
+ Street Address:<br>
+ <input type="text" name="street">
+ <br>
+ City:<br>
+ <input type="text" name="city">
+ <input type="submit" value="Submit" id="submit">
+ 
+ </form>
+ </div>
+
+ <div id="inf"name="inf">
+ <span>Search any address!</span>
+ <img id="imgs" src=""></img>
+ </div>
+ 
+ <script>
+ var lat = 0;
+ var lon = 0;
+ $('#form').submit(function(e){
+	e.preventDefault();
+	$.ajax({
+
+		url:"http://nominatim.openstreetmap.org/search?format=json&" + $('#form').serialize(),
+		type:'GET',
+		dataType: 'json',
+		
+		success:function(data,status){
+			locationData=data;
+			console.log(data);
+			lat = data[0].lat;
+			lon = data[0].lon;
+			console.log(lat);
+			console.log("http://staticmap.openstreetmap.de/staticmap.php?center="+lat+"&"+lon+"&zoom=6&size=300x300&maptype=mapnik");
+			$("#inf span").text(data[0].display_name + " is a "
+			+ data[0].type + " located at lattitude " 
+			+lat+ ", longitude "+lon + ".");
+			$('#inf img').attr("src","http://staticmap.openstreetmap.de/staticmap.php?center="+lat+","+lon+"&zoom=15&size=300x300&maptype=mapnik");
+
+			}
+		});
+ });
+</script>
+ 
+
+
+
+</body>
+</html>
