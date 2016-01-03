@@ -89,7 +89,7 @@
 Select Country:
 <select name="country code" form="form">
 	<option value="AF">Afghanistan</option>
-	<option value="AX">Aland Islands</option>
+	<option value="AX">Åland Islands</option>
 	<option value="AL">Albania</option>
 	<option value="DZ">Algeria</option>
 	<option value="AS">American Samoa</option>
@@ -142,10 +142,10 @@ Select Country:
 	<option value="CD">Congo, the Democratic Republic of the</option>
 	<option value="CK">Cook Islands</option>
 	<option value="CR">Costa Rica</option>
-	<option value="CI">Cote d'Ivoire</option>
+	<option value="CI">Côte d'Ivoire</option>
 	<option value="HR">Croatia</option>
 	<option value="CU">Cuba</option>
-	<option value="CW">Curacao</option>
+	<option value="CW">Curaçao</option>
 	<option value="CY">Cyprus</option>
 	<option value="CZ">Czech Republic</option>
 	<option value="DK">Denmark</option>
