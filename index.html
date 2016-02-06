@@ -1,9 +1,15 @@
 <!DOCTYPE html>
-
-<html>
-	<head>
+<!-- saved from url=(0076)file:///C:/Users/Christian/Desktop/html5/christian20002.github.io/index.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
 		<style>
-
+		
+		@keyframes fadein {
+			from {	opacity: 0.0;
+					width: 1%}
+			to {	opacity: 1;
+					width 100%;}
+		}
+		
 		h1{
 			
 			text-align:center;
@@ -11,7 +17,7 @@
 			font-family: "Courier New", Courier, monospace;
 			color: black;
 			font-weight: normal;
-			font-size: 300%;
+			font-size: 500%;
 			
 			
 		}
@@ -20,30 +26,48 @@
 			font-family: "Courier New", Courier, monospace;
 			color: #212121;
 			font-weight: lighter;
+			font-size: 200%;
 		}
 		img.displayed{
+		
 		display:block;
 		margin-left: auto;
 		margin-right: auto; 
-		width: 90%;
+		width: 100%;
+		animation-name: fadein;
+		animation-duration: 0.3s;
 		
 		}
-		div{    
+		#dotsbox{
+		    
+            
+        
+            
+            display: block;
+            margin: auto;
+            width: 100%;
+            
+		}
+		#dots{
+            display: block;
+            margin: auto;
+            padding: 10%;
+		}
+		#dav{    
 			overflow: hidden;
-            z-index: 10px;
-			width: 70%;
+            
+			width: 500px;
 			
-			background-color: rgba(65,65,65,0.65);
+			background-color: rgba(00,00,00,.2);
 			box-shadow: 4px 4px 15px black;
 			color: #ffffff;
-			padding: 20px;
+			padding: 1px;
             margin: 0 auto;
-			margin-bottom: 30px;
+			margin-bottom: 50px;
 			}
 		body{
-			background-color: #212121;
-			background-image: url('ananew.jpg');
-			background-repeat:no-repeat;
+			background-color: #f1f1f1;
+			
 			background-size: 100%,100%;
 			padding: 30px;
 
@@ -53,14 +77,26 @@
 	</head>
 	
 	
-	<body >	
-		<h1>Ana Padilla</h1>
-		<h2>Studying Urban Planning :D</h2>
-		<div><img class ="displayed"src="anawalk.jpg"></img>
+	<body>	
+		<h1>Christian Aguilar</h1>
+		<h2>What else to say?</h2>
+
+        <div id = "dotsbox">
+            <svg align="center" width=200 height=32 xmlns="http://www.w3.org/2000/svg" id="dots">
+            <g>
+          <title>Layer 1</title>
+          <ellipse ry="4" rx="4" id="svg_1" cy="16" cx="020" stroke-width="5" stroke="#000000" fill="#000000"/>
+          <ellipse id="svg_2" ry="4" rx="4" cy="16" cx="80" stroke-width="5" stroke="#000000" fill="#000000"/>
+          <ellipse id="svg_3" ry="4" rx="4" cy="16" cx="140" stroke-width="5" stroke="#000000" fill="#000000"/>
+         </g>
+        </svg></div>
+		<div id="dav"><img class="displayed" src="./index_files/anawalk.jpg">
+		<h2>Notwithstanding</h2>
 		</div>
-		<div><img class ="displayed"src="anacafe.jpg"></img>
+		<div id="dav"><img class="displayed" src="./index_files/anacafe.jpg">
 		</div>
 		
 		
-	</body>
-</html>
+	
+
+</body></html>
