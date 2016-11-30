@@ -4,19 +4,16 @@
 var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
 function preload() {
-	game.load.image('fish','ass/costume2.png');
-	game.load.image('ground','ass/ground.png');
-	game.load.spritesheet('mac','ass/macwalktot.png',22,22);
-	game.load.spritesheet('macwalkleft','ass/macwalkleft.png',22,22);
+	game.load.image('fish','ass/20160122_124114.jpg
+');
+	game.load.image('ground','ass/20160122_124114.jpg
+');
 	cursors = game.input.keyboard.createCursorKeys();
 }
 var mack;
 var platforms;
 function create() {
 	mack = game.add.sprite(0,0,'mac');
-	
-	var macwalkr = mack.animations.add('walkr',[0,1,2,3,4,5,6,7],12,true);
-	var macwalkl = mack.animations.add('walkl',[8,9,10,11,12,13,14],12,true);
 	
 	
 	//mack.animations.play('walk',12,true);
@@ -47,13 +44,11 @@ function create() {
 function update() {
 	if (cursors.left.isDown){
 	mack.body.velocity.x = -90;
-	mack.animations.play('walkr',12,false);
 	
 	}
 	
 	if (cursors.right.isDown){
 	mack.body.velocity.x = 90;
-	mack.animations.play('walkl',12,false);
 	
 	}
 	if (!(cursors.right.isDown || cursors.left.isDown)){
