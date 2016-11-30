@@ -4,10 +4,8 @@
 var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
 function preload() {
-	game.load.image('fish','ass/20160122_124114.jpg
-');
-	game.load.image('ground','ass/20160122_124114.jpg
-');
+	game.load.image('fish','ass/20160122_124114.jpg');
+	game.load.image('ground','ass/20160122_124114.jpg');
 	cursors = game.input.keyboard.createCursorKeys();
 }
 var mack;
