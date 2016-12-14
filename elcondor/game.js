@@ -37,7 +37,7 @@ function create() {
 	var block = platforms.create(10,10, 'ground');
 	block.body.immovable = true;
 	block.scale.setTo(1,1);
-	*//
+	*/
 	
 	
 	
@@ -61,6 +61,6 @@ function update() {
 	mack.body.velocity.y = 2000;
 	}
 	game.physics.arcade.collide(platforms,mack);
-	*//
+	*/
 	
 }
