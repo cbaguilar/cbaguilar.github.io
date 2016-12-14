@@ -4,16 +4,16 @@
 var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
 function preload() {
-	/*
+
 	game.load.image('fish','ass/20160122_124114.jpg');
 	game.load.image('ground','ass/20160122_124114.jpg');
-	*/
+
 	cursors = game.input.keyboard.createCursorKeys();
 }
 var mack;
 var platforms;
 function create() {
-	/**
+	
 	mack = game.add.sprite(0,0,'mac');
 	
 	
@@ -37,17 +37,16 @@ function create() {
 	var block = platforms.create(10,10, 'ground');
 	block.body.immovable = true;
 	block.scale.setTo(1,1);
-	*//
-	
+
 	
 	
 }
 
 function update() {
-	/**
+
 	if (cursors.left.isDown){
 	mack.body.velocity.x = -90;
-	hohho
+	//hohho
 	}
 	
 	if (cursors.right.isDown){
@@ -61,6 +60,6 @@ function update() {
 	mack.body.velocity.y = 2000;
 	}
 	game.physics.arcade.collide(platforms,mack);
-	*//
+
 	
 }
