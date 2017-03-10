@@ -35,6 +35,7 @@ function start(){
 	game.load.audio('tunak', 'ass/tunaksmall.ogg');
 	game.load.image('melo','ass/melo.png');
 	game.load.image('condor','ass/condormicro.png')
+	game.losd.image('frank','ass/frank.jpg');
 	game.load.image('ground','ass/melo.png');
 	game.load.start();
 }
@@ -56,6 +57,8 @@ function loadComplete() {
 	
 	
 	mack = game.add.sprite(0,0,'condor');
+	
+	frank = game.add.sprite(50,50,'frank');
 
 	
 	
