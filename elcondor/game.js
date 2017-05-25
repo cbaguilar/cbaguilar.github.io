@@ -133,7 +133,7 @@ function createMonsters(){
 
 	for (var y = 0; y < 2; y++)
 	{
-		for (var x = 0; x < 8; x++)
+		for (var x = 1; x < 9; x++)
 		{
 			var monster = monsters.create(x*90, y*60,monIMGS[Math.floor(Math.random()*monIMGS.length)]);
 			monster.anchor.setTo(0.5,0.5);
@@ -240,6 +240,7 @@ function update() {
 		else{
 			if (cursors.down.isDown){
 				createMonsters();
+				moveCon();
 			}
 		}
 	if(finished == 0){
