@@ -162,7 +162,7 @@ function fadeOut(order){
 		game.add.tween(frank).to( {alpha:0.9}, 5000, Phaser.Easing.Linear.None, true);
 		window.setTimeout(function(){fadeOut(3);},4000);
 	case 3:
-		game.add.tween(frank).to( {alpha:0.1}, 5000, Phaser.Easing.Linear.None, true);
+		game.add.tween(frank).to( {alpha:0.5}, 5000, Phaser.Easing.Linear.None, true);
 	case 5:
 		game.add.tween(shrek).to( {alpha:0.9}, 5000, Phaser.Easing.Linear.None, true);
 		
@@ -231,7 +231,7 @@ function update() {
 			
 			if (timer > 300-difficulty){
 			timer = 0;
-			difficulty +=3;
+			difficulty +=10;
 			createMonsters();
 			}
 	
@@ -257,7 +257,7 @@ function update() {
 	if (fireButton.isDown && cooldown < 0){
 		console.log("shoot")
 		createBullet();
-		cooldown = 15;
+		cooldown = 20;
 	}
 	cooldown--;
 
