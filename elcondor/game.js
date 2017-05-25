@@ -162,7 +162,7 @@ function fadeOut(order){
 		game.add.tween(frank).to( {alpha:0.9}, 5000, Phaser.Easing.Linear.None, true);
 		window.setTimeout(function(){fadeOut(3);},4000);
 	case 3:
-		game.add.tween(frank).to( {alpha:0.5}, 5000, Phaser.Easing.Linear.None, true);
+		game.add.tween(frank).to( {alpha:0.4}, 5000, Phaser.Easing.Linear.None, true);
 	case 5:
 		game.add.tween(shrek).to( {alpha:0.9}, 5000, Phaser.Easing.Linear.None, true);
 		
