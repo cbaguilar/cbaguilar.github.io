@@ -226,7 +226,12 @@ function update() {
 	
 	if(load && this.cache.isSoundDecoded('tunak')&&gameover == false){
 		if(monstersCreated){
-
+			
+			if (timer > 300){
+			timer = 0;
+			createMonsters();
+			}
+	
 			descend();
 		}
 	if(finished == 0){
@@ -253,10 +258,6 @@ function update() {
 	}
 	cooldown--;
 
-	if (timer > 500 && Math.Random < 0.5){
-		timer = 0;
-		createMonsters();
-	}
 	
 	if (cursors.left.isDown){
 	connor.body.velocity.x = -150;
