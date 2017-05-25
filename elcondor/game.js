@@ -263,13 +263,13 @@ function update() {
 
 	
 	if (cursors.left.isDown){
-	connor.body.velocity.x = -100;
+	connor.body.velocity.x = -170;
 	//createMonsters();
 	//hohho
 	}
 	
 	if (cursors.right.isDown){
-	connor.body.velocity.x = 100;
+	connor.body.velocity.x = 170;
 	
 	}
 	if (!(cursors.right.isDown || cursors.left.isDown)){
