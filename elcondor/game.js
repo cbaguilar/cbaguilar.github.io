@@ -133,7 +133,7 @@ function createMonsters(){
 
 	for (var y = 0; y < 2; y++)
 	{
-		for (var x = 0; x < 10; x++)
+		for (var x = 0; x < 8; x++)
 		{
 			var monster = monsters.create(x*90, y*60,monIMGS[Math.floor(Math.random()*monIMGS.length)]);
 			monster.anchor.setTo(0.5,0.5);
@@ -231,7 +231,7 @@ function update() {
 			
 			if (timer > 300-difficulty){
 			timer = 0;
-			difficulty +=10;
+			difficulty +=3;
 			createMonsters();
 			}
 	
@@ -257,7 +257,7 @@ function update() {
 	if (fireButton.isDown && cooldown < 0){
 		console.log("shoot")
 		createBullet();
-		cooldown = 35;
+		cooldown = 15;
 	}
 	cooldown--;
 
