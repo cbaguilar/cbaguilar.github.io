@@ -133,7 +133,7 @@ function createMonsters(){
 
 	for (var y = 0; y < 2; y++)
 	{
-		for (var x = 0; x < 7; x++)
+		for (var x = 0; x < 10; x++)
 		{
 			var monster = monsters.create(x*90, y*60,monIMGS[Math.floor(Math.random()*monIMGS.length)]);
 			monster.anchor.setTo(0.5,0.5);
@@ -197,6 +197,8 @@ function fshrek(){
 var finished = 0;
 var cooldown = 100;
 
+var difficulty = 0;
+
 function collisionHandler (bullet, alien) {
 
     //  When a bullet hits an alien we kill them both
@@ -227,8 +229,9 @@ function update() {
 	if(load && this.cache.isSoundDecoded('tunak')&&gameover == false){
 		if(monstersCreated){
 			
-			if (timer > 300){
+			if (timer > 300-difficulty){
 			timer = 0;
+			difficulty +=10;
 			createMonsters();
 			}
 	
@@ -254,19 +257,19 @@ function update() {
 	if (fireButton.isDown && cooldown < 0){
 		console.log("shoot")
 		createBullet();
-		cooldown = 20;
+		cooldown = 35;
 	}
 	cooldown--;
 
 	
 	if (cursors.left.isDown){
-	connor.body.velocity.x = -150;
+	connor.body.velocity.x = -100;
 	//createMonsters();
 	//hohho
 	}
 	
 	if (cursors.right.isDown){
-	connor.body.velocity.x = 150;
+	connor.body.velocity.x = 100;
 	
 	}
 	if (!(cursors.right.isDown || cursors.left.isDown)){
