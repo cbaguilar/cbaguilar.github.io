@@ -237,6 +237,11 @@ function update() {
 	
 			descend();
 		}
+		else{
+			if (cursors.down.isDown){
+				createMonsters();
+			}
+		}
 	if(finished == 0){
 		connor.y = 100;
 		finished = 1;
