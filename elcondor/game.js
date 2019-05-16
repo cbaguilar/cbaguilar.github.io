@@ -224,7 +224,7 @@ function gameOver (floor, alien) {
 var timer = 0;
 function update() {
 
-	
+		
 	
 	if(load && this.cache.isSoundDecoded('tunak')&&gameover == false){
 		if(monstersCreated){
@@ -260,6 +260,8 @@ function update() {
 	faded = 1;
 	}
 	
+	
+		
 	if (fireButton.isDown && cooldown < 0){
 		console.log("shoot")
 		createBullet();
@@ -268,7 +270,7 @@ function update() {
 	cooldown--;
 
 	
-	if (cursors.left.isDown){
+	if (cursors.left.isDown||(game.input.pointer1.isDown)){
 	connor.body.velocity.x = -170;
 	//createMonsters();
 	//hohho
