@@ -11,7 +11,11 @@
       width: 100%;
     }
   </style>
-  
+  Click anywhere to generate a polygon.
+ <form>
+  Minutes:<br>
+  <input type="text" name="minutes" id="timeform" value = 15><br>
+</form>
   <link rel="stylesheet" href="https://js.arcgis.com/4.12/esri/css/main.css">
   <script src="https://js.arcgis.com/4.12/"></script>
   
@@ -43,7 +47,7 @@
       
       view.on("click", function(event){
         var locationGraphic = createGraphic(event.mapPoint);
-        var driveTimeCutoffs = [30]; // Minutes (default)
+        var driveTimeCutoffs = [document.getElementById("timeform").value]; // Minutes (default)
         var serviceAreaParams = createServiceAreaParams(locationGraphic, driveTimeCutoffs, view.spatialReference);
         executeServiceAreaTask(serviceAreaParams);
       });
