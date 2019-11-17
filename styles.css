@@ -1,0 +1,139 @@
+
+body {
+  /*background-image: url('photos/anza.jpg');*/
+  background-size: cover;
+}
+
+
+	ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #333;
+  margin: auto;
+  width: 800px;
+}
+
+li {
+  
+}
+
+li a {
+  float: right;
+  vertical-align: bottom;
+  display: block;
+  color: white;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-family: "Roboto Mono", Courier, monospace;
+  font-weight: normal;
+  font-size: 150%;
+}
+
+div.social {
+    margin: auto;
+    padding: 10px;
+    overflow: hidden;
+    width: 300px;
+}
+
+div.wrap {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #333;
+}
+
+div.f {
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19); 
+    opacity: 0.7;
+    padding: 20px; 
+    margin-top: 30px; 
+    font-family: "Roboto Mono", Courier, monospace;
+    width: 712px;
+    overflow: auto;
+    margin-left: auto;
+    margin-right: auto;
+    font-weight: normal;
+    font-size: 110%;
+    background-color: #ffffff;   
+}
+
+/* Change the link color to #111 (black) on hover */
+li a:hover {
+  background-color: #111;
+}
+			
+		@keyframes fadein {
+			from {	opacity: 0.0;
+					width: 1%}
+			to {	opacity: 1;
+					width 100%;}
+		}
+		
+		h1{
+			
+			text-align:center;
+			font-weight: normal;
+			font-family: "Roboto Mono", Courier, monospace;
+			color: white;
+			font-weight: normal;
+			font-size: 200%;
+            float: left;
+			
+			
+		}
+		h2{
+			text-align:center;
+			font-family: "Roboto Mono", Courier, monospace;
+			color: #212121;
+			font-weight: lighter;
+			font-size: 200%;
+		}
+		img.displayed{
+		
+		display:block;
+		margin-left: auto;
+		margin-right: auto; 
+		width: 100%;
+		animation-name: fadein;
+		animation-duration: 0.3s;
+		
+		}
+		#dotsbox{
+		    
+            
+        
+            
+            display: block;
+            margin: auto;
+            width: 100%;
+            
+		}
+		#dots{
+            display: block;
+            margin: auto;
+            padding: 100px;
+		}
+		#dav{    
+			overflow: hidden;
+            
+			width: 100px;
+			
+			background-color: rgba(00,00,00,.2);
+			box-shadow: 4px 4px 15px black;
+			color: #ffffff;
+			padding: 1px;
+            margin: 0 auto;
+			margin-bottom: 50px;
+			}
+		{
+			background-color: #f1f1f1;
+			
+			background-size: 100%,100%;
+			padding: 30px;
+
+		
+		}
