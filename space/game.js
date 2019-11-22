@@ -224,7 +224,7 @@ function update() {
 
 		
 	
-	if(load && this.cache.isSoundDecoded('tunak')&&gameover == false){
+	if(load &&gameover == false){
 		if(monstersCreated){
 			
 			if (timer > 300-difficulty){
@@ -248,11 +248,9 @@ function update() {
 	melo.visible=true;
 	
 	if (faded == 0){
-	game.time.events.add(Phaser.Timer.SECOND*10,fshrek, this);
-	game.time.events.add(Phaser.Timer.SECOND*2,fadeIn, this);
-	game.time.events.add(Phaser.Timer.SECOND*10,showCon, this);
-	game.time.events.add(Phaser.Timer.SECOND*28.5,moveCon, this);
-	game.time.events.add(Phaser.Timer.SECOND*35,createMonsters, this);
+	game.time.events.add(Phaser.Timer.SECOND*2,showCon, this);
+	game.time.events.add(Phaser.Timer.SECOND*2,moveCon, this);
+	game.time.events.add(Phaser.Timer.SECOND*3,createMonsters, this);
 
 
 	faded = 1;
