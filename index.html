@@ -1,38 +1,129 @@
 <!DOCTYPE html>
 <!-- saved from url=(0076)file:///C:/Users/Christian/Desktop/html5/christian20002.github.io/index.html -->
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
-<link rel="stylesheet" type="text/css" href="styles.css">
-	<link href="http://fonts.googleapis.com/css?family=EB+Garamond" rel="stylesheet" type="text/css">
-	</head>
-	<body>
-  <div class = "wrap" >
-  <ul>
-  <li><h1>Christian Aguilar</h1></li>
-  <li><a href="adventures.html">Adventures</a></li>
-  <li><a href="projects.html">Projects</a></li>
-  <li><a href="index.html">Home</a></li>
-  </div>
+<html>
 
-  <div class  = "f"> <p> Hi! I'm Christian, an undergraduate at UCLA 
-      currently studying Computer Science and Engineering. Here, you can see
-      some of my personal projects. The most interesting ones involve
-      interfacing physical devices such as sprinkler solenoids and garage
-      openers to user-friendly control applications. All of my projects
-      are available to view on my GitHub, linked below.</p></div>
-  
-  <div class = "social">
-      <a href = "https://github.com/christian20002">
-          <img src = "github-square.svg" width=100px>
-      </a>
-      <a href = "https://www.linkedin.com/in/christian-aguilar-a65333184/">
-          <img src = "linkedin-square.svg" width = 100px>
-      </a>
-    </div>
-		<!---<div id="dav"><img class="displayed" src="anawalk.jpg">
-		<h2><a href="elcondor/index.html">Home Automation<a></h2>
-		</div>
-		<div id="dav"><img class="displayed" src="anacafe.jpg">
-		</div>
-		<div id="dav"><img class="displayed" src="trees">
-        </div>--!>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <link href="http://fonts.googleapis.com/css?family=EB+Garamond" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+    <ul>
+        <li>
+            <h1>Christian Aguilar</h1>
+        </li>
+        <li><a href="adventures.html">Adventures</a></li>
+        <li><a href="projects.html">Projects</a></li>
+        <li><a href="index.html">Home</a></li>
+
+    </ul>
+
+        <div class="f">
+            <p> Helo! I'm Christian, an masters student at UCLA
+                currently studying Computer Science. My broad interests
+                include networking, operating systems, driver development,
+                IoT, and full-stack system design.
+            </p>
+        </div>
+
+        <div class="f">
+            <h2>Experience</h2>
+            <h3>UCLA Water Technologies Research Center. 2020-Present</h3>
+
+            <p>
+                I currently work with the UCLA Water Technologies Research
+                (WaTeR) Center on their distributed water treatment project
+                in the Salinas Valley. During my undergraduate years, I designed
+                and implemented several major components for the project's
+                "cyberinfrastructure." This included a REST API to collect
+                sensor data from hundreds of devices in the field, integration
+                with MongoDB and PostgreSQL databases for sensor data storage,
+                and a web application to remotely monitor the water treatment
+                systems and download sensor data for scientific analysis. 
+            </p>
+
+            <h3>Google Cloud Software Engineering Intern. Sunnyvale, Summer 2023</h3>
+            <p> 
+                I had the wonderful opportunity of working with platforms teams
+                at Google Cloud. My project focused on writing PCIe-level simulations
+                of new network hardware being developed for Google Cloud.
+                Much of my summer involved learning about PCIe, writing
+                QEMU simulations, and debugging interactions with the Linux Kernel.
+            </p>
+            <p>
+                Most of my work was done in C. I got to work with the
+                <a href="https://docs.kernel.org/next/networking/device_drivers/ethernet/intel/idpf.html">IDPF Driver,</a> which was pretty exciting as it is still
+                    in development.
+            </p>
+
+            <h3>D.E. Shaw & Co. Systems Technologist Intern. New York, Summer 2022</h3>
+            <p>
+                My summer at D.E. Shaw was spent working with systems teams to
+                develop a new tool to manage highly available distributed
+                timeseries databases. This was my first real exposure to
+                PostgreSQL and distributed systems. Most of my code was in
+                Golang with some shell scripts used to automate deployment.
+                This was a neat experience in independently designing, developing, and
+                testing a new tool from scratch.
+            </p>
+
+            <h3>WhatsApp (Meta) Software Engineering Intern. Menlo Park/Remote, Summer 2021</h3>
+            <p>
+                I worked with the WhatsApp Business API team. I contributed to
+                the implementation of the new cloud-based WhatsApp Business API,
+                which was publicly released a few months after my internship.
+                This was a very fun opportunity to work with a large codebase
+                and follow the development of a new product from its early stages.
+            </p>   
+            <p>
+                My main contribution was the implementation of route selection
+                for media messages (stickers, images, videos, etc.). This involved
+                a very fun deep dive into the WhatsApp media pipeline and
+                interactions between old and new back-end systems.
+            </p>
+
+            <h3>NASA Jet Propulsion Laboratory Intern. Remote, Summer 2020, Spring 2021</h3>
+            <p>
+                My first software internships were with section 332H at JPL.
+                This group focused on interplanetary communications. My internship
+                focused on developing software to interact with
+                <a href="https://www.nasa.gov/directorates/somd/space-communications-navigation-program/interplanetary-overlay-network/">
+                    ION</a>, JPL's implementation of 
+                <a href="https://en.wikipedia.org/wiki/Delay-tolerant_networking">
+                Delay Tolerant Networking (DTN).</a>
+            </p>
+            <p>
+                My summer project involved developing an extension to ION to
+                support opportunisic message routing following the
+                <a href="https://dl.acm.org/doi/10.1145/1080139.1080143">
+                    "Spray and Wait"</a>
+                algorithm. The ION codebase, which is written in C,
+                is designed to be very platform-agnostic with a particular
+                emphasis on supporting RTOS environments on flight computers.
+                As a result, the codebase acts almost like a mini operating system,
+                so I gained experience with many OS concepts such as
+                sempahores, mutexes, message queues, and managing shared
+                memory. 
+            </p>
+            <p>
+                I returned to JPL in the spring to work with PyION, a Python
+                wrapper for ION. At the beginning of my internship, there
+                existed conflicts between the memory management system of
+                ION and Python's Global Interpreter Lock (GIL).I interned
+                part-time refactoring the PyION codebase to resolve these
+                conflicts. Since PyION is a C python extension, 
+                this internship gave me a cool opportunity to think about
+                ownership, object lifetimes, and memory management in C. 
+            </p>
+        </div>
+
+        <div class="social">
+            <a href="https://github.com/christian20002">
+                <img src="github-square.svg" width=100px>
+            </a>
+            <a href="https://www.linkedin.com/in/christian-aguilar-a65333184/">
+                <img src="linkedin-square.svg" width=100px>
+            </a>
+        </div>
 </body></html>
