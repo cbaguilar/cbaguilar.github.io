@@ -3,9 +3,32 @@
  */
 var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
+
+var characters = ['bird', 'frank', 'shrek', 'badcon', 'stanley']; // Names of character sprites
+var selectedCharacter;
+var characterSprites = [];
+var selector; // A sprite for the selector arrow
+var selectionIndex = 0; // Index of the currently selected character
+
+
 function preload() {
 
+    game.load.image('melo','ass/melo.png');
+	game.load.image('condor','ass/condormicro.png')
+	game.load.image('frank','ass/minifrank.png');
+	game.load.image('ground','ass/melo.png');
 
+	game.load.image('grass','ass/grass.png');
+	//game.load.image('juice','ass/juice.png');
+
+	game.load.image('badcon','ass/ryland.png');
+	game.load.image('shrek','ass/noah.png');
+	game.load.image('bird','ass/pat.png');
+
+	game.load.image('juice','ass/sjuice.png');
+
+	game.load.image('over','ass/over.png');
+	game.load.image('stanley', 'ass/stanley.png')
 	
 	cursors = game.input.keyboard.createCursorKeys();
 }
@@ -23,31 +46,56 @@ function create() {
 	
 	text = game.add.text(100,100,'Welcome',{fill: '#ffffff'});
 	text.setText("started");
-	start();
-	
 
+	characters.forEach(function(name, index) {
+        var sprite = game.add.sprite(100 + index * 200, 300, name);
+        sprite.anchor.setTo(0.5, 0.5);
+        characterSprites.push(sprite);
+    });
+    selector = game.add.sprite(100, 300, 'selector');
+    selector.anchor.setTo(0.5, 1.5);
 
-	
+    var enterKey = game.input.keyboard.addKey(Phaser.Keyboard.ENTER);
+    enterKey.onDown.add(startGame, this);
+
+    cursors = game.input.keyboard.createCursorKeys();
+    cursors.right.onDown.add(moveRight, this);
+    cursors.left.onDown.add(moveLeft, this);
+
 }
+
+function moveRight() {
+    selectionIndex = (selectionIndex + 1) % characters.length;
+    selector.x = 100 + selectionIndex * 200;
+}
+
+function moveLeft() {
+    selectionIndex = (selectionIndex + characters.length - 1) % characters.length;
+    selector.x = 100 + selectionIndex * 200;
+}
+
+function startGame() {
+    selectedCharacter = characters[selectionIndex];
+	//destroy charater selection screen
+
+	characterSprites.forEach(function(sprite) {
+		sprite.visible = false;
+
+		sprite.destroy();
+	});
+	selector.visible = false;
+	//game.state.
+
+	start();
+    //game.state.start('mainGame');
+}
+
+
+
 
 function start(){
 	text.setText("starting to load");
-	game.load.image('melo','ass/melo.png');
-	game.load.image('condor','ass/condormicro.png')
-	game.load.image('frank','ass/frank.jpg');
-	game.load.image('ground','ass/melo.png');
-
-	game.load.image('grass','ass/grass.png');
-	//game.load.image('juice','ass/juice.png');
-
-	game.load.image('badcon','ass/condormm.png');
-	game.load.image('shrek','ass/shreks.png');
-	game.load.image('badf','ass/minifrank.png');
-	game.load.image('bird','ass/smallb.png');
-
-	game.load.image('juice','ass/sjuice.png');
-
-	game.load.image('over','ass/over.png');
+	
 	
 	fireButton = game.input.keyboard.addKey(Phaser.Keyboard.A);
 
@@ -56,7 +104,7 @@ function start(){
 }
 var score = 0;
 var gameover = false;
-var monIMGS = ["shrek",'badcon', 'bird','badf'];
+var monIMGS = ["shrek",'badcon','frank', 'bird','stanley'];
 
 function loadStart(){
 	text.setText("loading..")
@@ -73,14 +121,14 @@ function loadComplete() {
 
 	
 	
-	connor = game.add.sprite(0,0,'condor');
-	connor.scale.setTo(0.5,0.5);
+	connor = game.add.sprite(0,0,selectedCharacter);
 
 	
 	frank = game.add.sprite(300,150,'frank');
 	
 	shrek = game.add.sprite(400,400,'shrek');
 	shrek.alpha = 0.01;
+	shrek.scale.setTo(0.01,0.01);
 	
 	over = game.add.sprite(0,0,'over');
 	over.visible = false;
@@ -133,6 +181,10 @@ function createMonsters(){
 	{
 		for (var x = 1; x < 9; x++)
 		{
+			print
+			if (difficulty / 1000 < Math.random()){
+				continue;
+			}
 			var monster = monsters.create(x*90, y*60,monIMGS[Math.floor(Math.random()*monIMGS.length)]);
 			monster.anchor.setTo(0.5,0.5);
 			monster.body.velocity.y= Math.random()*50;
@@ -148,34 +200,8 @@ function descend() {
 	monsters.x += 2*(Math.random()-0.5)
 }
 
-function fadeOut(order){
-	console.log("tweening"+ order);
-	switch (order){	
-	case 1:
-		game.add.tween(melo).to( {alpha:0}, 3000, Phaser.Easing.Linear.None, true);
-		game.add.tween(frank).to( {alpha:0.9}, 2000, Phaser.Easing.Linear.None, true);
-		window.setTimeout(function(){fadeOut(2);},4000);
-	case 2:	
-		//await sleep(1000);
-		game.add.tween(frank).to( {alpha:0.9}, 5000, Phaser.Easing.Linear.None, true);
-		window.setTimeout(function(){fadeOut(3);},4000);
-	case 3:
-		game.add.tween(frank).to( {alpha:0.4}, 5000, Phaser.Easing.Linear.None, true);
-	case 5:
-		game.add.tween(shrek).to( {alpha:0.9}, 5000, Phaser.Easing.Linear.None, true);
-		
-	}
 
 
-}
-
-function fadeIn(){
-	game.add.tween(melo).to( {alpha:0.9}, 2000, Phaser.Easing.Linear.None, true);
-	//fadeOut();
-	console.log("trying to tween");
-	window.setTimeout(function(){fadeOut(1);},7000);
-	
-}
 
 
 
@@ -219,6 +245,9 @@ function gameOver (floor, alien) {
 }
 
 
+
+
+
 var timer = 0;
 function update() {
 
@@ -227,7 +256,7 @@ function update() {
 	if(load &&gameover == false){
 		if(monstersCreated){
 			
-			if (timer > 300-difficulty){
+			if (timer > 1000-difficulty){
 			timer = 0;
 			difficulty +=10;
 			createMonsters();
