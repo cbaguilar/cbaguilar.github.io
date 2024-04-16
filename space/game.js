@@ -182,7 +182,7 @@ function createMonsters(){
 		for (var x = 1; x < 9; x++)
 		{
 			
-			if (Math.random() > 0.5){
+			if (Math.random() > (difficulty/100)){
 				continue;
 			}
 			var monster = monsters.create(x*90, y*60,monIMGS[Math.floor(Math.random()*monIMGS.length)]);
@@ -256,7 +256,7 @@ function update() {
 	if(load &&gameover == false){
 		if(monstersCreated){
 			
-			if (timer > 1000-difficulty){
+			if (timer > 500-difficulty){
 			timer = 0;
 			difficulty +=10;
 			createMonsters();
