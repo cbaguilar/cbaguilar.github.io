@@ -4,7 +4,7 @@
 var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
 
-var characters = ['bird', 'frank', 'shrek', 'badcon', 'stanley']; // Names of character sprites
+var characters = ['bird', 'frank', 'shrek', 'badcon', 'stanley', 'david']; // Names of character sprites
 var selectedCharacter;
 var characterSprites = [];
 var selector; // A sprite for the selector arrow
@@ -14,6 +14,7 @@ var selectionIndex = 0; // Index of the currently selected character
 function preload() {
 
     game.load.image('melo','ass/melo.png');
+	game.load.image('david', 'ass/david.png');
 	game.load.image('condor','ass/condormicro.png')
 	game.load.image('frank','ass/minifrank.png');
 	game.load.image('ground','ass/melo.png');
@@ -105,7 +106,7 @@ function start(){
 }
 var score = 0;
 var gameover = false;
-var monIMGS = ["shrek",'badcon','frank', 'bird','stanley'];
+var monIMGS = ["shrek",'badcon','frank', 'bird','stanley', 'david'];
 
 function loadStart(){
 	text.setText("loading..")
