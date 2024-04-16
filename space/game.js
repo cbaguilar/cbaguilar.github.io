@@ -181,8 +181,8 @@ function createMonsters(){
 	{
 		for (var x = 1; x < 9; x++)
 		{
-			print
-			if (difficulty / 1000 < Math.random()){
+			
+			if (Math.random() > 0.5){
 				continue;
 			}
 			var monster = monsters.create(x*90, y*60,monIMGS[Math.floor(Math.random()*monIMGS.length)]);
