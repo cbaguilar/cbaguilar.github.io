@@ -17,6 +17,7 @@ function preload() {
 	game.load.image('condor','ass/condormicro.png')
 	game.load.image('frank','ass/minifrank.png');
 	game.load.image('ground','ass/melo.png');
+	game.load.image('selector', 'ass/selector.png'); // Load an arrow or any other selector image
 
 	game.load.image('grass','ass/grass.png');
 	//game.load.image('juice','ass/juice.png');
@@ -52,7 +53,7 @@ function create() {
         sprite.anchor.setTo(0.5, 0.5);
         characterSprites.push(sprite);
     });
-    selector = game.add.sprite(100, 300, 'selector');
+    selector = game.add.sprite(100, 375, 'selector');
     selector.anchor.setTo(0.5, 1.5);
 
     var enterKey = game.input.keyboard.addKey(Phaser.Keyboard.ENTER);
