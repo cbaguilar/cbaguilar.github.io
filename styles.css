@@ -5,7 +5,7 @@ body {
 }
 
 
-	ul {
+	ul.navbar {
   list-style-type: none;
   margin: 0;
   padding: 0;
@@ -15,11 +15,11 @@ body {
   width: 800px;
 }
 
-li {
+li.navbar {
   color: #000000;
 }
 
-li a {
+li.navbar a {
   float: right;
   vertical-align: bottom;
   display: block;
