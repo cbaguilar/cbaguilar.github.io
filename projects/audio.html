@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PC scatter — zoomable + on-demand MEL/WAV (S3)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --gap: 12px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; }
+    header { display:flex; flex-wrap:wrap; gap:var(--gap); align-items:center; padding:10px 12px; border-bottom:1px solid #ddd;}
+    #chart { width:100vw; height: calc(100vh - 220px); }
+    .pill { padding:6px 10px; border:1px solid #ccc; border-radius:999px; background:#fafafa; }
+    .hint { color:#666; font-size:.9rem; }
+    input[type="file"] { display:none; }
+    label[for] { cursor:pointer; }
+    #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #111; color: #fff;
+             padding: 8px 12px; border-radius: 8px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+    #toast.show { opacity:.92; }
+    #status { display:flex; gap:12px; align-items:center; padding:8px 12px; border-bottom:1px solid #eee; flex-wrap:wrap;}
+    #status .tag { background:#f4f4f4; border:1px solid #ddd; border-radius:999px; padding:4px 10px; font-size:.9rem; }
+    input.url { width: 420px; padding:6px 10px; border:1px solid #ccc; border-radius:8px; }
+
+    dialog { width: min(1100px, 96vw); border: none; border-radius: 12px; padding: 0; box-shadow: 0 12px 40px rgba(0,0,0,.25);}    
+    .dlg-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #e5e5e5; }
+    .dlg-body { display:grid; grid-template-columns: 2fr 1fr; gap:16px; padding:14px; }
+    .dlg-foot { padding:10px 14px; border-top:1px solid #e5e5e5; display:flex; gap:10px; justify-content:space-between; align-items:center; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .stack { display:flex; flex-direction:column; gap:8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+    /* MEL + overlay stacked in a wrapper to allow the time cursor */
+    #melWrap { position:relative; width:100%; height:480px; }
+    #melCanvas, #melOverlay {
+      position:absolute; inset:0; width:100%; height:100%;
+      border-radius:8px; image-rendering: pixelated;
+    }
+    #melCanvas { border:1px solid #ddd; background:#fff; }
+
+    .small { font-size:.9rem; color:#555; }
+    button, .btn { padding:6px 10px; border:1px solid #ccc; border-radius:8px; background:#f8f8f8; cursor:pointer; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5"></script>
+</head>
+<body>
+  <header>
+    <label for="csvFile" class="pill">📄 Load CSV (file)</label>
+    <input id="csvFile" type="file" accept=".csv,text/csv" />
+    <span class="pill">
+      CSV URL:
+      <input id="csvURL" class="url" placeholder="https://…/your.csv" />
+      <button id="loadCsvURL" class="btn">Load</button>
+    </span>
+    <button id="demoBtn" class="pill" title="Load a tiny inline demo">Load demo rows</button>
+    <span class="pill">
+      Color by:
+      <select id="colorMode">
+        <option value="confusion">Confusion (TP/TN/FP/FN)</option>
+        <option value="pred">Prediction (pred)</option>
+        <option value="true">Ground truth (true)</option>
+        <option value="correct">Correct (boolean)</option>
+      </select>
+    </span>
+    <span class="pill">
+      Opacity:
+      <input id="opacity" type="range" min="10" max="100" value="70" />
+      <span id="opacityVal" class="hint">0.70</span>
+    </span>
+    <span class="pill">
+      <label>Point size:</label>
+      <input id="ptSize" type="range" min="2" max="18" value="6" />
+      <span id="ptSizeVal" class="hint">6</span>
+    </span>
+    <span class="hint">Click a point → modal fetches MEL/WAV from S3 on demand. Hover for details. Double‑click plot to reset zoom.</span>
+  </header>
+
+  <div id="status">
+    <span>MEL Base URL:</span>
+    <input id="melBase" class="url" />
+    <span>WAV Base URL:</span>
+    <input id="wavBase" class="url" />
+    <span class="tag" id="rowCount">rows: 0</span>
+    <span class="tag" id="seriesCount">series pts: 0</span>
+    <span class="tag" id="srcTag">source: <em>—</em></span>
+    <span class="hint">Ensure trailing slashes. Drag & drop a CSV anywhere on the page.</span>
+  </div>
+
+  <div id="chart"></div>
+  <div id="toast">Copied</div>
+
+  <!-- Modal -->
+  <dialog id="viewer">
+    <div class="dlg-head">
+      <div class="stack">
+        <div><strong id="dlgTitle">Item</strong></div>
+        <div class="small mono" id="dlgKey"></div>
+      </div>
+      <div class="row">
+        <button id="copyKeyBtn" class="btn" title="Copy s3_key">Copy s3_key</button>
+        <button id="closeBtn" class="btn">Close</button>
+      </div>
+    </div>
+    <div class="dlg-body">
+      <div class="stack">
+        <div id="melWrap">
+          <canvas id="melCanvas" width="640" height="480"></canvas>
+          <canvas id="melOverlay"></canvas>
+        </div>
+        <div class="row">
+          <label>Contrast:</label>
+          <input id="contrast" type="range" min="1" max="99" value="98" />
+          <span class="small" id="contrastVal">p[1,99] stretch</span>
+          <span class="small"> | MEL file: <span id="melName" class="mono"></span></span>
+        </div>
+      </div>
+      <div class="stack">
+        <audio id="audio" controls preload="metadata" style="width:100%"></audio>
+        <div class="small">Audio file: <span id="wavName" class="mono"></span></div>
+        <div class="row">
+          <label for="overrideMel" class="btn">Pick MEL (.npy)</label>
+          <input id="overrideMel" type="file" accept=".npy" />
+          <label for="overrideWav" class="btn">Pick Audio (.wav)</label>
+          <input id="overrideWav" type="file" accept=".wav,audio/wav,audio/x-wav" />
+        </div>
+        <div class="small">
+          Auto-match uses stem: <code>name.wav.npy</code> ↔ <code>name.wav</code>. If blocked, use “Pick …”.
+        </div>
+        <div class="stack">
+          <div><b>Record</b></div>
+          <div class="small mono" id="meta"></div>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <span class="small">Open directly:</span>
+      <div class="row">
+        <button id="openMelURL" class="btn">Open MEL URL</button>
+        <button id="openWavURL" class="btn">Open WAV URL</button>
+      </div>
+    </div>
+  </dialog>
+
+<script>
+/* ---------- Prefill S3 prefixes ---------- */
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('melBase').value =
+    'https://svwn-audio-files.s3.us-west-1.amazonaws.com/bluerock_mel_22050_128/';
+  document.getElementById('wavBase').value =
+    'https://svwn-audio-files.s3.us-west-1.amazonaws.com/bluerock/';
+  // Prefill CSV URL with your example
+  document.getElementById('csvURL').value =
+    'https://svwn-audio-files.s3.us-west-1.amazonaws.com/test_results/vis_delivery_svm_predictions.csv';
+});
+
+/* ---------- Toast ---------- */
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1100); }
+
+/* ---------- Next animation frame twice (layout settle) ---------- */
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+/* ---------- CSV loaders ---------- */
+const srcTagEl = document.getElementById('srcTag');
+
+async function fetchTextCORS(url){
+  const r = await fetch(url, { mode:'cors' });
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+  return r.text();
+}
+function setSourceTag(s){ srcTagEl.innerHTML = 'source: <em>' + s + '</em>'; }
+
+async function loadCSVFromURL(url){
+  try{
+    setSourceTag('loading…');
+    const txt = await fetchTextCORS(url);
+    rows = parseCSVRobust(txt);
+    document.getElementById('rowCount').textContent = `rows: ${rows.length}`;
+    if (rows.length === 0) toast('Parsed 0 rows from CSV — check headers');
+    render();
+    setSourceTag(url);
+  }catch(e){
+    console.error(e);
+    toast('CSV load failed: ' + e.message);
+    setSourceTag('error');
+  }
+}
+
+/* ---------- Drag & drop CSV anywhere ---------- */
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev, e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; }));
+['drop'].forEach(ev=>document.addEventListener(ev, async e=>{
+  e.preventDefault();
+  const file = Array.from(e.dataTransfer.files||[]).find(f=>/\.csv$/i.test(f.name));
+  if(!file) return;
+  const txt = await file.text();
+  rows = parseCSVRobust(txt);
+  document.getElementById('rowCount').textContent = `rows: ${rows.length}`;
+  setSourceTag(file.name);
+  render();
+}));
+
+/* ---------- Robust CSV parser (quoted fields, BOM) ---------- */
+// Expects headers: s3_key,pc1,pc2,mel_path,pred,proba,true,ok,correct
+function parseCSVRobust(text){
+  if (!text) return [];
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // strip BOM
+  const lines=[]; let cur='', inQ=false;
+  for (const ch of text){
+    if (ch === '"'){ if (inQ && cur.endsWith('"')) { cur=cur.slice(0,-1)+'"'; } else { inQ=!inQ; } continue; }
+    if ((ch === '\n' || ch === '\r') && !inQ){ if (cur.trim().length) lines.push(cur); cur=''; continue; }
+    cur += ch;
+  }
+  if (cur.trim().length) lines.push(cur);
+  if (!lines.length) return [];
+
+  const hdr = splitCSVLine(lines[0]).map(s=>s.trim());
+  const idx = Object.fromEntries(hdr.map((c,i)=>[c,i]));
+  const out=[];
+  for (let k=1;k<lines.length;k++){
+    const row = splitCSVLine(lines[k]);
+    if (row.length < hdr.length) continue;
+    const get = (name) => row[idx[name]] ?? '';
+    const num = (v) => (v===''||v===null||v===undefined? NaN : Number(v));
+    out.push({
+      s3_key: (get('s3_key')||'').trim(),
+      pc1: num(get('pc1')),
+      pc2: num(get('pc2')),
+      mel_path: (get('mel_path')||'').trim(),
+      pred: num(get('pred')),
+      proba: num(get('proba')),
+      true: num(get('true')),
+      ok: String(get('ok')).toLowerCase()==='true',
+      correct: String(get('correct')).toLowerCase()==='true',
+    });
+  }
+  return out;
+}
+function splitCSVLine(line){
+  const out=[]; let cur='', inQ=false;
+  for (let i=0;i<line.length;i++){
+    const ch=line[i];
+    if (ch === '"'){
+      if (inQ && line[i+1] === '"'){ cur+='"'; i++; continue; }
+      inQ=!inQ; continue;
+    }
+    if (ch === ',' && !inQ){ out.push(cur); cur=''; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/* ---------- NPY parser (float32/float64, Fortran-aware) ---------- */
+async function readNPYFromArrayBuffer(buf){
+  const u8=new Uint8Array(buf);
+  const MAGIC=[0x93,78,85,77,80,89];
+  for(let i=0;i<MAGIC.length;i++) if(u8[i]!==MAGIC[i]) throw new Error('Not .npy');
+  const ver=u8[6];
+  const hdrLen=(ver<=1)?(u8[8]|(u8[9]<<8)):(u8[8]|(u8[9]<<8)|(u8[10]<<16)|(u8[11]<<24));
+  const hdrStart=(ver<=1)?10:12;
+  const hdr=new TextDecoder().decode(u8.slice(hdrStart,hdrStart+hdrLen));
+  const descr=/'descr':\s*'([^']+)'/.exec(hdr)?.[1];
+  const fOrder=/'fortran_order':\s*(True|False)/.exec(hdr)?.[1]==='True';
+  const shapeStr=/'shape':\s*\(([^)]+)\)/.exec(hdr)?.[1]||'';
+  const shape=shapeStr.split(',').map(s=>s.trim()).filter(Boolean).map(Number);
+  const dataOffset=hdrStart+hdrLen;
+
+  let typed;
+  if (descr === '<f4') typed=new Float32Array(buf,dataOffset);
+  else if (descr === '<f8') typed=new Float64Array(buf,dataOffset);
+  else throw new Error(`Unsupported dtype ${descr}; need <f4 or <f8`);
+
+  let dataF32 = (typed instanceof Float32Array) ? typed : new Float32Array(typed);
+
+  if (fOrder && shape.length===2) {
+    const [A,B]=shape; const out=new Float32Array(A*B); let k=0;
+    for(let j=0;j<B;j++) for(let i=0;i<A;i++) out[i*B + j]=dataF32[k++];
+    dataF32 = out;
+  }
+  return { data:dataF32, shape };
+}
+
+/* ---------- Percentile & orientation ---------- */
+function percentile(arr,p){
+  const a=Array.from(arr).filter(Number.isFinite).sort((x,y)=>x-y);
+  if(!a.length) return 0;
+  const idx=(p/100)*(a.length-1);
+  const lo=Math.floor(idx), hi=Math.ceil(idx);
+  if(lo===hi) return a[lo];
+  const w=idx-lo; return a[lo]*(1-w)+a[hi]*w;
+}
+function orientMel(data, shape){
+  if (shape.length!==2) return {flat:data, H:shape[0]||0, W:shape[1]||0};
+  let H=shape[0], W=shape[1];
+  const melsFirst = (H <= 512 && W >= H);
+  if (!melsFirst){
+    const out=new Float32Array(data.length);
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++) out[x*H+y]=data[y*W+x];
+    return {flat:out, H:W, W:H};
+  }
+  return {flat:data, H, W};
+}
+
+/* ---------- Canvas sizing helpers (DPR-aware) ---------- */
+function resizeCanvasToDisplaySize(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.floor(canvas.clientWidth  * dpr);
+  const cssH = Math.floor(canvas.clientHeight * dpr);
+  if (canvas.width !== cssW || canvas.height !== cssH) {
+    canvas.width = cssW;
+    canvas.height = cssH;
+    return true;
+  }
+  return false;
+}
+
+/* ---------- MEL canvas rendering (fixed) ---------- */
+let melDrawRect = null; // {dx, dy, dw, dh, W, H, canvasWidth, canvasHeight}
+function renderMelToCanvas(mel2d, shape, canvas, contrastPct=98){
+  const {flat,H,W}=orientMel(mel2d,shape);
+  const ctx=canvas.getContext('2d');
+  if(!H||!W){ ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+
+  // Ensure backing store matches CSS size & DPR
+  resizeCanvasToDisplaySize(canvas);
+
+  // Build source image
+  const off=document.createElement('canvas');
+  off.width=W; off.height=H;
+  const octx=off.getContext('2d');
+
+  const img=octx.createImageData(W,H);
+  const lowp=(100-contrastPct)/2, highp=100-lowp;
+  const lo=percentile(flat,lowp), hi=percentile(flat,highp), inv=1/(hi-lo||1);
+
+  for(let i=0;i<flat.length;i++){
+    let v=flat[i];
+    if(!Number.isFinite(v)) v=lo;
+    let t=(v-lo)*inv; if(t<0)t=0; if(t>1)t=1;
+    const g=(t*255)|0;
+    const j=i*4;
+    img.data[j]=img.data[j+1]=img.data[j+2]=g; img.data[j+3]=255;
+  }
+  octx.putImageData(img,0,0);
+
+  // Draw scaled into canvas coordinates, preserving aspect
+  ctx.imageSmoothingEnabled = true;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const scale = Math.min(canvas.width / W, canvas.height / H);
+  const dw = Math.floor(W * scale), dh = Math.floor(H * scale);
+  const dx = ((canvas.width  - dw) / 2) | 0;
+  const dy = ((canvas.height - dh) / 2) | 0;
+  ctx.drawImage(off,0,0,W,H, dx,dy,dw,dh);
+
+  // Save last draw metrics (device pixels)
+  melDrawRect = { dx, dy, dw, dh, W, H, canvasWidth: canvas.width, canvasHeight: canvas.height };
+}
+
+/* ---------- Name helpers ---------- */
+function basename(p){ return (p||'').split('/').pop(); }
+function stem(name){ return name.replace(/\.(wav\.npy|npy|wav)$/i,''); }
+function ensureSlash(s){ return s.endsWith('/') ? s : (s + '/'); }
+
+/* ---------- Modal / On-demand fetch ---------- */
+const viewer=document.getElementById('viewer');
+const melCanvas=document.getElementById('melCanvas');
+const melOverlay=document.getElementById('melOverlay');
+const audioEl=document.getElementById('audio');
+const dlgTitle=document.getElementById('dlgTitle');
+const dlgKey=document.getElementById('dlgKey');
+const melNameEl=document.getElementById('melName');
+const wavNameEl=document.getElementById('wavName');
+const metaEl=document.getElementById('meta');
+const melBaseEl=document.getElementById('melBase');
+const wavBaseEl=document.getElementById('wavBase');
+
+let currentRec=null, currentMelData=null;
+
+async function fetchArrayBuffer(url){
+  const r=await fetch(url, {mode:'cors'});
+  if(!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+  return await r.arrayBuffer();
+}
+async function loadMelByURL(url){
+  try{
+    const buf=await fetchArrayBuffer(url);
+    const parsed=await readNPYFromArrayBuffer(buf);
+    if (!parsed.shape || parsed.shape.length !== 2) throw new Error(`Unexpected shape: ${parsed.shape}`);
+    currentMelData={data:parsed.data, shape:parsed.shape};
+    const pct=Number(document.getElementById('contrast').value);
+    renderMelToCanvas(parsed.data, parsed.shape, melCanvas, pct);
+    drawCursorAtTime(melOverlay, audioEl.currentTime || 0, audioEl.duration || 0);
+  }catch(e){ console.error(e); toast(`MEL load failed: ${e.message}`); }
+}
+
+async function openModalFor(rec){
+  currentRec=rec;
+  const melFile = basename(rec.mel_path) || basename(rec.s3_key);
+  const base    = stem(melFile);
+  const wavFile = `${base}.wav`;
+
+  dlgTitle.textContent=`pred=${rec.pred}  true=${rec.true}  p=${(+rec.proba).toFixed(4)}  ${rec.correct?'✓ correct':'✗ incorrect'}`;
+  dlgKey.textContent=rec.s3_key;
+  melNameEl.textContent=melFile||'(none)';
+  wavNameEl.textContent=wavFile;
+  metaEl.textContent=JSON.stringify(rec,null,2);
+
+  const melURL = ensureSlash(melBaseEl.value.trim()) + melFile;
+  const wavURL = ensureSlash(wavBaseEl.value.trim()) + wavFile;
+
+  // Open FIRST so canvas has real layout metrics
+  viewer.showModal();
+  await nextFrame(); // ensure dialog layout is complete
+
+  // Clear and then load/draw
+  currentMelData=null;
+  melCanvas.getContext('2d').clearRect(0,0,melCanvas.width,melCanvas.height);
+  if(melFile && melBaseEl.value){ await loadMelByURL(melURL); }
+
+  // Helpful when S3 requires CORS headers
+  audioEl.crossOrigin = 'anonymous';
+  audioEl.removeAttribute('src');
+  if(wavBaseEl.value){ audioEl.src = wavURL; audioEl.load(); }
+
+  document.getElementById('openMelURL').onclick=()=>window.open(melURL,'_blank');
+  document.getElementById('openWavURL').onclick=()=>window.open(wavURL,'_blank');
+}
+
+document.getElementById('closeBtn').onclick=()=>{ viewer.close(); stopCursorLoop(); };
+document.getElementById('copyKeyBtn').onclick=()=>{ if(!currentRec) return; navigator.clipboard.writeText(currentRec.s3_key).then(()=>toast('Copied s3_key')).catch(()=>toast('Copy failed')); };
+
+document.getElementById('contrast').addEventListener('input',()=>{
+  if (!currentMelData) return;
+  const v=Number(document.getElementById('contrast').value);
+  document.getElementById('contrastVal').textContent=`p[${((100-v)/2)|0},${(100-((100-v)/2))|0}] stretch`;
+  renderMelToCanvas(currentMelData.data,currentMelData.shape,melCanvas,v);
+  drawCursorAtTime(melOverlay, audioEl.currentTime || 0, audioEl.duration || 0);
+});
+document.getElementById('overrideMel').addEventListener('change',async(e)=>{
+  const f=e.target.files[0]; if (!f) return;
+  const buf=await f.arrayBuffer(); const {data,shape}=await readNPYFromArrayBuffer(buf);
+  currentMelData={data,shape};
+  const pct=Number(document.getElementById('contrast').value);
+  renderMelToCanvas(data,shape,melCanvas,pct);
+  drawCursorAtTime(melOverlay, audioEl.currentTime || 0, audioEl.duration || 0);
+});
+document.getElementById('overrideWav').addEventListener('change',(e)=>{
+  const f=e.target.files[0]; if (!f) return;
+  audioEl.src=URL.createObjectURL(f); audioEl.load(); wavNameEl.textContent=f.name;
+});
+
+/* ---------- ECharts ---------- */
+const chart=echarts.init(document.getElementById('chart'),null,{renderer:'canvas'});
+let rows=[], colorMode='confusion', alpha=0.7, pointSize=6;
+let persistedZoom=null;
+
+function splitByConfusion(d){
+  const TP=[],TN=[],FP=[],FN=[];
+  for(const r of d){
+    const t=Number(r.true), p=Number(r.pred);
+    if (t===1 && p===1) TP.push(r);
+    else if (t===0 && p===0) TN.push(r);
+    else if (t===0 && p===1) FP.push(r);
+    else if (t===1 && p===0) FN.push(r);
+  }
+  return {TP,TN,FP,FN};
+}
+
+function seriesFrom(data, name, shape, color, z=0){
+  return {
+    name, type:'scatter',
+    data: data.map(r => [r.pc1, r.pc2, r]),
+    symbol: shape,
+    symbolSize: pointSize,
+    itemStyle: { color, opacity: alpha, borderWidth:(name==='FP'||name==='FN'||name==='incorrect')?1.2:0.6, borderColor:'#00000055' },
+    encode: { x:0, y:1 },
+    z,
+    large: true,
+    largeThreshold: 2000,
+    progressive: 5000,
+    progressiveThreshold: 10000,
+    hoverLayerThreshold: Infinity,
+    animation: false,
+    blendMode: 'source-over'
+  };
+}
+
+function makeOption(){
+  const baseTooltip = {
+    trigger:'item',
+    confine: true,
+    appendToBody: true,
+    formatter:(params)=>{
+      const rec=params.value[2];
+      const sName=params.seriesName;
+      return `
+      <div style="font-family:inherit">
+        <div><b>${sName}</b></div>
+        <div>pc1: ${isFinite(rec.pc1)?rec.pc1.toFixed(3):rec.pc1} &nbsp; pc2: ${isFinite(rec.pc2)?rec.pc2.toFixed(3):rec.pc2}</div>
+        <div>s3_key: <code>${rec.s3_key}</code></div>
+        <div>pred: ${rec.pred} (p=${(rec.proba??NaN).toFixed?rec.proba.toFixed(4):rec.proba}) &nbsp; true: ${rec.true}</div>
+        <div>correct: ${rec.correct}</div>
+        <div style="margin-top:6px; display:flex; gap:6px;">
+          <button onclick="navigator.clipboard.writeText('${String(rec.s3_key).replace(/'/g, "\\'")}').then(()=>({})).catch(()=>({}))" style="padding:4px 8px;">Copy s3_key</button>
+          <button onclick="window.__openFromTooltip('${String(rec.s3_key).replace(/'/g, "\\'")}')" style="padding:4px 8px;">Open modal</button>
+        </div>
+      </div>`;
+    }
+  };
+
+  const axisCommon = { nameLocation:'middle', nameGap:28, axisLine:{onZero:false} };
+
+  let series=[];
+  if (colorMode==='confusion'){
+    const {TP,TN,FP,FN}=splitByConfusion(rows);
+    document.getElementById('seriesCount').textContent =
+      `series pts: TN=${TN.length} TP=${TP.length} FP=${FP.length} FN=${FN.length}`;
+    series = [
+      seriesFrom(TN,'TN','circle',  '#1f77b4', 10), // blue
+      seriesFrom(TP,'TP','rect',    '#2ca02c',  9), // green
+      seriesFrom(FP,'FP','triangle','#ff7f0e',  8), // orange
+      seriesFrom(FN,'FN','diamond', '#d62728',  7), // red
+    ];
+  } else if (colorMode==='pred'){
+    const p0=rows.filter(r=>r.pred===0), p1=rows.filter(r=>r.pred===1);
+    document.getElementById('seriesCount').textContent = `series pts: pred0=${p0.length} pred1=${p1.length}`;
+    series = [
+      seriesFrom(p0,'pred=0','circle', '#1f77b4', 9),
+      seriesFrom(p1,'pred=1','rect',   '#2ca02c', 8),
+    ];
+  } else if (colorMode==='true'){
+    const t0=rows.filter(r=>r.true===0), t1=rows.filter(r=>r.true===1);
+    document.getElementById('seriesCount').textContent = `series pts: true0=${t0.length} true1=${t1.length}`;
+    series = [
+      seriesFrom(t0,'true=0','circle', '#1f77b4', 9),
+      seriesFrom(t1,'true=1','rect',   '#2ca02c', 8),
+    ];
+  } else {
+    const ok=rows.filter(r=>r.correct), bad=rows.filter(r=>!r.correct);
+    document.getElementById('seriesCount').textContent = `series pts: correct=${ok.length} incorrect=${bad.length}`;
+    series = [
+      seriesFrom(ok,'correct','circle',  '#2ca02c', 9),
+      seriesFrom(bad,'incorrect','diamond','#d62728', 8),
+    ];
+  }
+
+  return {
+    animation:false,
+    tooltip: baseTooltip,
+    grid:{ left:48, right:18, top:20, bottom:60 },
+    xAxis:{ ...axisCommon, name:'pc1' },
+    yAxis:{ ...axisCommon, name:'pc2', scale:true },
+    legend:{ top:4 },
+    series,
+    dataZoom: [
+      { type:'inside', zoomOnMouseWheel:true, moveOnMouseMove:true, moveOnMouseWheel:true },
+      { type:'slider', xAxisIndex:0 },
+      { type:'slider', yAxisIndex:0 }
+    ],
+    brush: { toolbox: ['rect','polygon','clear'], throttleType: 'debounce', throttleDelay: 100 },
+    toolbox: { feature: { saveAsImage: {}, restore: {} } }
+  };
+}
+
+window.__openFromTooltip = (s3key) => {
+  const rec = rows.find(r => r.s3_key === s3key);
+  if (rec) openModalFor(rec);
+};
+
+function render(){
+  // persist zoom between re-renders
+  const prev = chart.getOption();
+  if (prev && prev.dataZoom && prev.dataZoom.length) {
+    persistedZoom = prev.dataZoom;
+  }
+  const opt = makeOption();
+  if (persistedZoom) opt.dataZoom = persistedZoom;
+  chart.setOption(opt, true);
+}
+
+/* ---------- Chart interactions ---------- */
+chart.on('click', function(p){
+  if(!p||!p.data) return;
+  const rec=p.data[2];
+  if (rec) openModalFor(rec);
+});
+chart.getZr().on('dblclick', ()=>{
+  chart.dispatchAction({ type:'dataZoom', start:0, end:100, dataZoomIndex:0 });
+  chart.dispatchAction({ type:'dataZoom', start:0, end:100, dataZoomIndex:1 });
+  chart.dispatchAction({ type:'dataZoom', start:0, end:100, dataZoomIndex:2 });
+});
+
+/* ---------- Controls ---------- */
+document.getElementById('colorMode').addEventListener('change',(e)=>{ colorMode=e.target.value; render(); });
+document.getElementById('opacity').addEventListener('input',(e)=>{ const a=Number(e.target.value)/100; document.getElementById('opacityVal').textContent=a.toFixed(2); alpha=a; render(); });
+document.getElementById('ptSize').addEventListener('input',(e)=>{ pointSize=Number(e.target.value); document.getElementById('ptSizeVal').textContent=String(pointSize); render(); });
+
+document.getElementById('csvFile').addEventListener('change',async(e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const txt = await f.text();
+  rows = parseCSVRobust(txt);
+  document.getElementById('rowCount').textContent = `rows: ${rows.length}`;
+  setSourceTag(f.name);
+  if (rows.length === 0) toast('Parsed 0 rows from CSV — check headers');
+  render();
+});
+
+document.getElementById('loadCsvURL').addEventListener('click', ()=>{
+  const url = document.getElementById('csvURL').value.trim();
+  if (!url) return;
+  loadCSVFromURL(url);
+});
+document.getElementById('csvURL').addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter') {
+    const url = e.target.value.trim();
+    if (url) loadCSVFromURL(url);
+  }
+});
+
+/* Demo loader */
+document.getElementById('demoBtn').addEventListener('click', ()=>{
+  const demo = `s3_key,pc1,pc2,mel_path,pred,proba,true,ok,correct
+bluerock_mel_22050_128/bluerock_1751639587.775598.wav.npy,-2370.5542,-222.29478,bluerock_1751639587.775598.wav.npy,0,0.00034,0,true,true
+bluerock_mel_22050_128/bluerock_1751639599.067594.wav.npy,-3285.447,148.38187,bluerock_1751639599.067594.wav.npy,0,0.00031,0,true,true
+bluerock_mel_22050_128/bluerock_1751639610.36162.wav.npy,-1811.851,155.35791,bluerock_1751639610.36162.wav.npy,1,0.91,0,true,false
+bluerock_mel_22050_128/bluerock_1751639621.64762.wav.npy,2150.2,-42.1,bluerock_1751639621.64762.wav.npy,1,0.82,1,true,true
+bluerock_mel_22050_128/bluerock_1751639632.931657.wav.npy,1988.0,-3.1,bluerock_1751639632.931657.wav.npy,0,0.07,1,true,false`;
+  rows = parseCSVRobust(demo);
+  document.getElementById('rowCount').textContent = `rows: ${rows.length}`;
+  setSourceTag('demo inline');
+  render();
+});
+
+/* ---------- Resize handling ---------- */
+window.addEventListener('resize', ()=>{
+  chart.resize();
+  redrawMelAndCursor();
+});
+
+/* ---------- MEL overlay cursor ---------- */
+function resizeOverlayToMatch(baseCanvas, overlayCanvas){
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.floor(baseCanvas.clientWidth  * dpr);
+  const cssH = Math.floor(baseCanvas.clientHeight * dpr);
+  if (overlayCanvas.width !== cssW || overlayCanvas.height !== cssH) {
+    overlayCanvas.width = cssW;
+    overlayCanvas.height = cssH;
+  }
+}
+function drawCursorAtTime(overlayCanvas, t, duration){
+  const ctx = overlayCanvas.getContext('2d');
+  resizeOverlayToMatch(melCanvas, overlayCanvas);
+  ctx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+  if (!melDrawRect || !Number.isFinite(duration) || duration <= 0) return;
+
+  const {dx, dy, dw, dh} = melDrawRect;
+  const x = dx + Math.max(0, Math.min(1, t / duration)) * dw;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, dy);
+  ctx.lineTo(x, dy + dh);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.setLineDash([8, 6]);
+  ctx.stroke();
+
+  const label = `${t.toFixed(2)}s`;
+  ctx.font = '14px ui-monospace, Menlo, monospace';
+  const pad = 6;
+  const textW = ctx.measureText(label).width;
+  const boxW = textW + pad*2, boxH = 20;
+  let bx = x + 8, by = dy + 8;
+  if (bx + boxW > overlayCanvas.width) bx = x - 8 - boxW;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillRect(bx, by, boxW, boxH);
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx, by, boxW, boxH);
+  ctx.fillStyle = '#000';
+  ctx.fillText(label, bx + pad, by + 14);
+  ctx.restore();
+}
+
+let cursorRAF = null;
+function startCursorLoop(){
+  if (cursorRAF) return;
+  const loop = () => {
+    cursorRAF = requestAnimationFrame(loop);
+    const t = Number.isFinite(audioEl.currentTime) ? audioEl.currentTime : 0;
+    const dur = Number.isFinite(audioEl.duration) && audioEl.duration > 0 ? audioEl.duration : 0;
+    drawCursorAtTime(melOverlay, t, dur);
+  };
+  cursorRAF = requestAnimationFrame(loop);
+}
+function stopCursorLoop(){
+  if (cursorRAF) { cancelAnimationFrame(cursorRAF); cursorRAF = null; }
+  const ctx = melOverlay.getContext('2d');
+  ctx.clearRect(0,0,melOverlay.width, melOverlay.height);
+}
+function redrawMelAndCursor(){
+  if (viewer.open && currentMelData) {
+    const pct = Number(document.getElementById('contrast').value);
+    renderMelToCanvas(currentMelData.data, currentMelData.shape, melCanvas, pct);
+    drawCursorAtTime(melOverlay, audioEl.currentTime || 0, audioEl.duration || 0);
+  }
+}
+audioEl.addEventListener('play',  startCursorLoop);
+audioEl.addEventListener('pause', stopCursorLoop);
+audioEl.addEventListener('ended', stopCursorLoop);
+audioEl.addEventListener('seeked', () => drawCursorAtTime(melOverlay, audioEl.currentTime || 0, audioEl.duration || 0));
+audioEl.addEventListener('loadedmetadata', () => drawCursorAtTime(melOverlay, 0, audioEl.duration || 0));
+
+/* ---------- Observe MEL canvas size changes (dialog/layout) ---------- */
+const melRO = new ResizeObserver(() => { redrawMelAndCursor(); });
+melRO.observe(melCanvas);
+
+/* ---------- Auto-load via ?csv=… ---------- */
+(function autoLoadFromQuery(){
+  const url = new URL(window.location.href);
+  const csv = url.searchParams.get('csv');
+  if (csv) {
+    document.getElementById('csvURL').value = csv;
+    loadCSVFromURL(csv);
+  }
+})();
+
+/* ---------- Globals used by render ---------- */
+const chartEl = document.getElementById('chart');
+
+</script>
+</body>
+</html>
