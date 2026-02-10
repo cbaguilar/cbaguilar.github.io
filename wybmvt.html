@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WYBMVT</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b0b0b;
+      color: #f5f1e8;
+      font-family: "Trebuchet MS", "Lucida Sans", sans-serif;
+      overflow: hidden;
+    }
+    #game {
+      width: 100%;
+      height: 100%;
+    }
+
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+</head>
+<body>
+  <div id="game"></div>
+  <div class="hint" id="hint">Click to begin</div>
+
+  <script>
+    const SLIDES = [
+      { key: 'sound', src: 'assets/wybmvt/sound.gif' },
+      { key: 'y2020', src: 'assets/wybmvt/2020.gif' },
+      { key: 'zoomies', src: 'assets/wybmvt/zoomies.gif' },
+      { key: 'soupp', src: 'assets/wybmvt/soupp.gif' },
+      { key: 'cheege', src: 'assets/wybmvt/cheege.gif' },
+      { key: 'rush', src: 'assets/wybmvt/rush.gif' },
+      { key: 'sea', src: 'assets/wybmvt/sea.gif' },
+      { key: 'vday', src: 'assets/wybmvt/sunshine.gif' },
+    ];
+
+    const config = {
+      type: Phaser.AUTO,
+      parent: 'game',
+      backgroundColor: '#0b0b0b',
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      scene: {
+        preload,
+        create,
+        update
+      }
+    };
+
+    const game = new Phaser.Game(config);
+
+    function preload() {
+      SLIDES.forEach(slide => this.load.image(slide.key, slide.src));
+      this.load.audio('bg', 'assets/wybmvt/illbelieve.wav');
+    }
+
+    function create() {
+      this.slideIndex = 0;
+      this.transitioning = false;
+      this.started = false;
+
+      this.canvasTexture = this.textures.createCanvas('slide-canvas', this.scale.width, this.scale.height);
+      this.canvasTexture.context.imageSmoothingEnabled = false;
+      this.slideSprite = this.add.image(this.scale.width / 2, this.scale.height / 2, 'slide-canvas');
+      this.slideSprite.setDisplaySize(this.scale.width, this.scale.height);
+
+      this.offCanvas = document.createElement('canvas');
+      this.offCtx = this.offCanvas.getContext('2d');
+      this.offCtx.imageSmoothingEnabled = false;
+
+      this.soundtrack = this.sound.add('bg', { loop: true, volume: 0.7 });
+
+      this.scale.on('resize', (gameSize) => {
+        const w = gameSize.width;
+        const h = gameSize.height;
+        this.canvasTexture.setSize(w, h);
+        this.canvasTexture.refresh();
+        this.slideSprite.setPosition(w / 2, h / 2);
+        this.slideSprite.setDisplaySize(w, h);
+        this.renderPixelated(SLIDES[this.slideIndex].key, 1);
+      });
+
+      this.input.on('pointerdown', () => {
+        if (!this.started) {
+          this.started = true;
+          document.getElementById('hint').textContent = 'Click to advance';
+          if (!this.soundtrack.isPlaying) {
+            this.soundtrack.play();
+          }
+        }
+        if (this.transitioning) {
+          return;
+        }
+        this.nextSlide();
+      });
+
+      this.renderPixelated = (key, pixelSize) => {
+        const w = this.scale.width;
+        const h = this.scale.height;
+        const pixel = Math.max(1, Math.floor(pixelSize));
+        const src = this.textures.get(key).getSourceImage();
+
+        this.offCanvas.width = Math.max(1, Math.floor(w / pixel));
+        this.offCanvas.height = Math.max(1, Math.floor(h / pixel));
+
+        this.offCtx.clearRect(0, 0, this.offCanvas.width, this.offCanvas.height);
+        this.offCtx.drawImage(src, 0, 0, this.offCanvas.width, this.offCanvas.height);
+
+        const ctx = this.canvasTexture.context;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(this.offCanvas, 0, 0, this.offCanvas.width, this.offCanvas.height, 0, 0, w, h);
+        this.canvasTexture.refresh();
+      };
+
+      this.nextSlide = () => {
+        this.transitioning = true;
+        this.slideIndex = (this.slideIndex + 1) % SLIDES.length;
+
+        const startPixel = 40;
+        const endPixel = 1;
+        const duration = 650;
+
+        this.renderPixelated(SLIDES[this.slideIndex].key, startPixel);
+
+        this.tweens.addCounter({
+          from: startPixel,
+          to: endPixel,
+          duration,
+          ease: 'Cubic.Out',
+          onUpdate: (tween) => {
+            const value = tween.getValue();
+            this.renderPixelated(SLIDES[this.slideIndex].key, value);
+          },
+          onComplete: () => {
+            this.renderPixelated(SLIDES[this.slideIndex].key, 1);
+            this.transitioning = false;
+          }
+        });
+      };
+
+      this.renderPixelated(SLIDES[this.slideIndex].key, 1);
+    }
+
+    function update() {
+      // Intentionally empty; transitions are tween-driven.
+    }
+  </script>
+</body>
+</html>
