@@ -14,15 +14,39 @@
     </ul>
 
     <div>
-        <p>Hello! I'm Christian, a master's student at UCLA currently studying Computer Science. My broad interests include networking, operating systems, driver development, IoT, and full-stack system design.</p>
+        <p>Hello! I'm Christian, I currently work at Datadog programming platform infrastructure tools that help developers release cool new products without having to worry about silly things like Terraform and CNAB bundles. </p>
+
+        <p>I graduated from UCLA in 2023, then stayed for a M.S. This was mostly completed in 2025 then totally completed in 2026.</p>
+
+        <p>I like computers. My broad interests include networking, operating systems, driver development, IoT, and full-stack system design. For my thesis I dabbled in ML-based acoustic sensing for water treatment systems.</p>
     </div>
 
     <div>
-        <h2>Experience</h2>
+        <h2>Past Experience</h2>
         <h3>UCLA Water Technologies Research Center. 2020-Present</h3>
         <p>
             I currently work with the UCLA Water Technologies Research (WaTeR) Center on their distributed water treatment project in the Salinas Valley. During my undergraduate years, I designed and implemented several major components for the project's "cyberinfrastructure." This included a REST API to collect sensor data from hundreds of devices in the field, integration with MongoDB and PostgreSQL databases for sensor data storage, and a web application to remotely monitor the water treatment systems and download sensor data for scientific analysis.
         </p>
+
+        <p>
+            Over the course of (too many?) industry internships, I learned that many of the design decisions I made when I was 19 were very silly. During my M.S. I took the opportunity to rewrite the core data ingestion and API service in Golang. Using a very nice library made by <a href="https://www.linkedin.com/in/michael-bunte/">Michael Bunte</a>, we migrated the front-end to React. My final thesis focused on using our massive dataset of water treatment sensor and PLC information to label several thousand audio clips that we recorded at the site, allowing us to train an inference model to reconstruct pump operations from just sound. I guess that makes me an ML engineer?
+        </p>
+
+        <h3>Google Borg?let intern. Fall 2024</h3>
+        <p>
+            I got to intern with the Borg and Borglet teams that handle global compute scheduling at Google. This was pretty freaking awesome. My project focused on improving the scheduling algorithm to use socket-level memory bandwidth metrics to prevent very heavy ML applications from starving eachother.
+        </p>
+
+        <p>
+            About halfways through the internship I learned that my old QEMU network device from 2023 was still being used, because it broke due to a kernel update. It should be able to handle unexpecteed opcodes more gracefully now!
+        </p>
+        
+
+        <h3>Datadog. Summer 2024</h3>
+        <p>
+            I spent this summer making tools to help engineers migrate from an ancient spaghetti Python service platform to our modern API framework. The tool did this whole graph traversal of python packages and performed some AST surgery to help make migrations easier. These days the whole job can probably be done by a Claude agent but it was fun to use leetcode in real life for a few months.
+        </p>
+    
 
         <h3>Google Cloud Software Engineering Intern. Sunnyvale, Summer 2023</h3>
         <p>
