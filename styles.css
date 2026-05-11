@@ -1,6 +1,11 @@
 /* NO MORE STYLES IN LA */
 
 
+:root {
+	color-scheme: light dark;
+	--bg: white;
+	--fg: black;
+}
 
 @media (prefers-color-scheme: dark) {
 	body {background: black; color: white}
@@ -10,4 +15,15 @@
 
 @media (prefers-color-scheme: light) {
 	body {background: white; color: black;
+}
+
+
+body {
+	background: var(--bg);
+	color: var(--fg);
+
+	margin: 2rem auto;
+	max-width: 760px;
+	padding: 0 1rem;
+
 }
