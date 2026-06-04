@@ -92,7 +92,7 @@
       group.setAttribute("transform", `translate(${node.x} ${node.y})`);
       group.classList.toggle("selected", Boolean(selected && selected.type === "node" && selected.id === node.id));
       const label = group.querySelector(".node-label");
-      if (label.textContent !== node.label) label.textContent = node.label;
+      if (label.dataset.label !== node.label) setWrappedText(label, node.label, 80);
     }
 
     removeStale(renderer.nodeElements, active);
@@ -123,9 +123,56 @@
     const hit = makeSvg("circle", { class: "node-hit", r: 13 });
     const circle = makeSvg("circle", { class: "node-dot", r: 7 });
     const text = makeSvg("text", { class: "node-label", x: 13, y: 5 });
-    text.textContent = node.label;
+    setWrappedText(text, node.label, 80);
     group.append(hit, circle, text);
     return group;
+  }
+
+  function setWrappedText(textElement, value, maxCharacters) {
+    const lines = wrapText(String(value || "Place"), maxCharacters);
+    textElement.dataset.label = value;
+    textElement.replaceChildren();
+
+    lines.forEach((line, index) => {
+      const tspan = makeSvg("tspan", {
+        x: 13,
+        dy: index === 0 ? "0" : "1.2em"
+      });
+      tspan.textContent = line;
+      textElement.append(tspan);
+    });
+  }
+
+  function wrapText(value, maxCharacters) {
+    const words = value.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return ["Place"];
+
+    const lines = [];
+    let current = "";
+
+    for (const word of words) {
+      if (word.length > maxCharacters) {
+        if (current) {
+          lines.push(current);
+          current = "";
+        }
+        for (let index = 0; index < word.length; index += maxCharacters) {
+          lines.push(word.slice(index, index + maxCharacters));
+        }
+        continue;
+      }
+
+      const next = current ? `${current} ${word}` : word;
+      if (next.length > maxCharacters) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+
+    if (current) lines.push(current);
+    return lines;
   }
 
   function removeStale(map, active) {
