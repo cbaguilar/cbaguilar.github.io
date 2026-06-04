@@ -7,9 +7,7 @@
     return {
       x: 0,
       y: 0,
-      scale: 1,
-      minScale: 0.08,
-      maxScale: 8
+      scale: 1
     };
   }
 
@@ -51,7 +49,8 @@
 
   function zoomAt(svg, viewport, clientX, clientY, factor) {
     const before = screenToWorld(svg, viewport, clientX, clientY);
-    const nextScale = clamp(viewport.scale * factor, viewport.minScale, viewport.maxScale);
+    const nextScale = viewport.scale * factor;
+    if (!Number.isFinite(nextScale) || nextScale <= 0) return;
     const pointer = screenPoint(svg, clientX, clientY);
     viewport.scale = nextScale;
 
@@ -73,10 +72,6 @@
     viewport.x = 0;
     viewport.y = 0;
     viewport.scale = 1;
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
   }
 
   MentalMap.Viewport = {
