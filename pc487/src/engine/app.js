@@ -1,4 +1,5 @@
 import { createPlayerController } from "./player.js";
+import { createVehicleController } from "./vehicle.js";
 
 const WORLD_SIZE = 180;
 
@@ -50,7 +51,9 @@ export function createPc487App({ canvas }) {
 
     function dispose() {
         window.removeEventListener("resize", resize);
+        sceneState.dispose();
         sceneState.playerController.dispose();
+        sceneState.vehicleController.dispose();
         scene.dispose();
         engine.dispose();
     }
@@ -105,6 +108,8 @@ function createScene(engine, canvas) {
         scene,
         camera,
         playerController: null,
+        vehicleController: null,
+        dispose: null,
         roads: [],
         buildings: [],
     };
@@ -113,9 +118,40 @@ function createScene(engine, canvas) {
     sceneState.roads = createRoadGrid(scene);
     sceneState.buildings = createBlockoutBuildings(scene);
     sceneState.playerController = createPlayerController({ scene, camera });
+    sceneState.vehicleController = createVehicleController({ scene });
     camera.lockedTarget = sceneState.playerController.mesh;
+    sceneState.dispose = createInteractionController(sceneState);
 
     return sceneState;
+}
+
+function createInteractionController(sceneState) {
+    function onKeyDown(event) {
+        if (event.code !== "KeyE" || event.repeat) {
+            return;
+        }
+
+        if (sceneState.vehicleController.active) {
+            sceneState.vehicleController.exit(sceneState.playerController.mesh);
+            sceneState.playerController.setActive(true);
+            sceneState.camera.lockedTarget = sceneState.playerController.mesh;
+            sceneState.camera.radius = 28;
+            return;
+        }
+
+        if (sceneState.vehicleController.canEnter(sceneState.playerController.mesh)) {
+            sceneState.playerController.setActive(false);
+            sceneState.vehicleController.enter();
+            sceneState.camera.lockedTarget = sceneState.vehicleController.mesh;
+            sceneState.camera.radius = 34;
+        }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+        window.removeEventListener("keydown", onKeyDown);
+    };
 }
 
 function createFlatGround(scene) {

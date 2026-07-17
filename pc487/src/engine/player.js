@@ -1,28 +1,89 @@
 const PLAYER_HEIGHT = 2;
 const PLAYER_HALF_HEIGHT = PLAYER_HEIGHT / 2;
 const WORLD_LIMIT = 86;
+const PLAYER_MODEL_PATH = "assets/models/";
+const PLAYER_MODEL_FILE = "player.glb";
 
 export function createPlayerController({ scene, camera }) {
     const mesh = createPlayerMesh(scene);
     const input = createInputState();
     const movement = new BABYLON.Vector3();
     const desiredDirection = new BABYLON.Vector3();
+    let active = true;
 
     mesh.position.set(0, PLAYER_HALF_HEIGHT, 0);
+    loadPlayerModel(scene, mesh);
 
     const observer = scene.onBeforeRenderObservable.add(() => {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-        updatePlayer({ mesh, camera, input, movement, desiredDirection, deltaSeconds });
+        updatePlayer({ mesh, camera, input, movement, desiredDirection, active, deltaSeconds });
     });
 
     return {
         mesh,
+        setActive(nextActive) {
+            active = nextActive;
+            mesh.setEnabled(nextActive);
+            movement.copyFromFloats(0, 0, 0);
+        },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
             input.dispose();
             mesh.dispose(false, true);
         },
     };
+}
+
+async function loadPlayerModel(scene, proxyMesh) {
+    if (!BABYLON.SceneLoader) {
+        console.warn("BabylonJS loader plugin is unavailable; using block player.");
+        return;
+    }
+
+    if (!(await optionalModelExists())) {
+        console.info(`Optional player model not found at ${PLAYER_MODEL_PATH}${PLAYER_MODEL_FILE}; using block player.`);
+        return;
+    }
+
+    try {
+        const result = await BABYLON.SceneLoader.ImportMeshAsync(
+            "",
+            PLAYER_MODEL_PATH,
+            PLAYER_MODEL_FILE,
+            scene,
+        );
+
+        if (result.meshes.length === 0) {
+            return;
+        }
+
+        const modelRoot = new BABYLON.TransformNode("playerModelRoot", scene);
+        modelRoot.parent = proxyMesh;
+        modelRoot.position.set(0, -PLAYER_HALF_HEIGHT, 0);
+        modelRoot.rotation.y = Math.PI;
+        modelRoot.scaling.setAll(1);
+
+        for (const importedMesh of result.meshes) {
+            if (importedMesh.parent === null) {
+                importedMesh.parent = modelRoot;
+            }
+        }
+
+        proxyMesh.visibility = 0;
+    } catch (error) {
+        console.warn("Failed to import optional player model; using block player.", error);
+    }
+}
+
+async function optionalModelExists() {
+    try {
+        const response = await fetch(`${PLAYER_MODEL_PATH}${PLAYER_MODEL_FILE}`, {
+            method: "HEAD",
+        });
+        return response.ok;
+    } catch {
+        return false;
+    }
 }
 
 function createPlayerMesh(scene) {
@@ -72,7 +133,11 @@ function createInputState() {
     };
 }
 
-function updatePlayer({ mesh, camera, input, movement, desiredDirection, deltaSeconds }) {
+function updatePlayer({ mesh, camera, input, movement, desiredDirection, active, deltaSeconds }) {
+    if (!active) {
+        return;
+    }
+
     const cameraForward = camera.getForwardRay().direction;
     cameraForward.y = 0;
 

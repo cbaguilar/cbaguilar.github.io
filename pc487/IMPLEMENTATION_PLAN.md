@@ -473,7 +473,7 @@ Before committing:
 - [x] Add a simple player block.
 - [x] Add keyboard movement.
 - [x] Add follow camera.
-- [ ] Add a placeholder vehicle if the controller stabilizes quickly.
+- [x] Add a placeholder vehicle if the controller stabilizes quickly.
 - [ ] Add `pc487/README.md` with local dev commands.
 
 ## Open Technical Questions
