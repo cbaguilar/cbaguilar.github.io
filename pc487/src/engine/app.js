@@ -1,8 +1,6 @@
-import {
-    TERRAIN_PRESETS,
-    createHeightmapTerrain,
-    getTerrainHeightAtWorld,
-} from "./terrain.js";
+import { createPlayerController } from "./player.js";
+
+const WORLD_SIZE = 180;
 
 export function createPc487App({ canvas }) {
     if (!canvas) {
@@ -52,19 +50,9 @@ export function createPc487App({ canvas }) {
 
     function dispose() {
         window.removeEventListener("resize", resize);
+        sceneState.playerController.dispose();
         scene.dispose();
         engine.dispose();
-    }
-
-    function toggleTerrainPreset() {
-        const currentIndex = TERRAIN_PRESETS.findIndex((preset) => preset.id === sceneState.terrainId);
-        const nextIndex = (currentIndex + 1) % TERRAIN_PRESETS.length;
-        setTerrainPreset(sceneState, TERRAIN_PRESETS[nextIndex].id);
-
-        return {
-            active: TERRAIN_PRESETS[nextIndex],
-            nextLabel: `Terrain ${TERRAIN_PRESETS[(nextIndex + 1) % TERRAIN_PRESETS.length].shortLabel}`,
-        };
     }
 
     return {
@@ -72,7 +60,6 @@ export function createPc487App({ canvas }) {
         engine,
         scene,
         start,
-        toggleTerrainPreset,
         toggleDebugLayer,
         dispose,
     };
@@ -83,18 +70,21 @@ function createScene(engine, canvas) {
     scene.clearColor = new BABYLON.Color4(0.56, 0.72, 0.87, 1);
 
     const camera = new BABYLON.ArcRotateCamera(
-        "debugCamera",
+        "followCamera",
         BABYLON.Tools.ToRadians(45),
-        BABYLON.Tools.ToRadians(62),
-        52,
-        new BABYLON.Vector3(0, 4, 0),
+        BABYLON.Tools.ToRadians(68),
+        28,
+        new BABYLON.Vector3(0, 1, 0),
         scene,
     );
-    camera.lowerRadiusLimit = 10;
-    camera.upperRadiusLimit = 120;
+    camera.lowerRadiusLimit = 12;
+    camera.upperRadiusLimit = 48;
+    camera.lowerBetaLimit = BABYLON.Tools.ToRadians(35);
+    camera.upperBetaLimit = BABYLON.Tools.ToRadians(82);
     camera.wheelDeltaPercentage = 0.01;
     camera.panningSensibility = 70;
     camera.attachControl(canvas, true);
+    camera.inputs.remove(camera.inputs.attached.keyboard);
 
     const sun = new BABYLON.DirectionalLight(
         "sun",
@@ -113,62 +103,38 @@ function createScene(engine, canvas) {
 
     const sceneState = {
         scene,
-        terrainId: TERRAIN_PRESETS[0].id,
-        terrainMesh: null,
-        playerMarker: null,
+        camera,
+        playerController: null,
         roads: [],
         buildings: [],
     };
 
-    sceneState.terrainMesh = createHeightmapTerrain(scene, sceneState.terrainId);
-
-    const playerMarker = createPlayerMarker(scene);
-    sceneState.playerMarker = playerMarker;
-
+    createFlatGround(scene);
     sceneState.roads = createRoadGrid(scene);
     sceneState.buildings = createBlockoutBuildings(scene);
-    placeWorldObjects(sceneState);
+    sceneState.playerController = createPlayerController({ scene, camera });
+    camera.lockedTarget = sceneState.playerController.mesh;
 
     return sceneState;
 }
 
-function setTerrainPreset(sceneState, terrainId) {
-    sceneState.terrainId = terrainId;
-    sceneState.terrainMesh.dispose(false, true);
-    sceneState.terrainMesh = createHeightmapTerrain(sceneState.scene, terrainId);
-    placeWorldObjects(sceneState);
-}
+function createFlatGround(scene) {
+    const groundMaterial = new BABYLON.StandardMaterial("flatGround", scene);
+    groundMaterial.diffuseColor = new BABYLON.Color3(0.44, 0.49, 0.43);
+    groundMaterial.specularColor = new BABYLON.Color3(0.04, 0.04, 0.04);
 
-function placeWorldObjects(sceneState) {
-    sceneState.playerMarker.position.y = getTerrainHeightAtWorld(0, 0, sceneState.terrainId) + 1;
-
-    for (const road of sceneState.roads) {
-        road.position.y = getTerrainHeightAtWorld(road.position.x, road.position.z, sceneState.terrainId) + 0.08;
-    }
-
-    for (const building of sceneState.buildings) {
-        building.position.y =
-            getTerrainHeightAtWorld(building.position.x, building.position.z, sceneState.terrainId) +
-            building.metadata.pc487Height / 2;
-    }
-}
-
-function createPlayerMarker(scene) {
-    const bodyMaterial = new BABYLON.StandardMaterial("playerMarkerBlue", scene);
-    bodyMaterial.diffuseColor = new BABYLON.Color3(0.14, 0.28, 0.74);
-
-    const marker = BABYLON.MeshBuilder.CreateBox(
-        "futurePlayerBlock",
+    const ground = BABYLON.MeshBuilder.CreateGround(
+        "flatWorldPlane",
         {
-            width: 1.4,
-            height: 2,
-            depth: 1.4,
+            width: WORLD_SIZE,
+            height: WORLD_SIZE,
+            subdivisions: 12,
         },
         scene,
     );
-    marker.material = bodyMaterial;
+    ground.material = groundMaterial;
 
-    return marker;
+    return ground;
 }
 
 function createRoadGrid(scene) {
@@ -195,7 +161,7 @@ function createRoadGrid(scene) {
             },
             scene,
         );
-        road.position.set(spec.x, 0, spec.z);
+        road.position.set(spec.x, 0.03, spec.z);
         road.material = roadMaterial;
         roads.push(road);
     }
@@ -231,10 +197,7 @@ function createBlockoutBuildings(scene) {
             },
             scene,
         );
-        building.position.set(spec.x, 0, spec.z);
-        building.metadata = {
-            pc487Height: spec.height,
-        };
+        building.position.set(spec.x, spec.height / 2, spec.z);
         building.material = materials[spec.material];
         meshes.push(building);
     }

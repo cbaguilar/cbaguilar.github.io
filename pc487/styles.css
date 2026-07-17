@@ -84,8 +84,7 @@ h1 {
     pointer-events: auto;
 }
 
-#debug-toggle,
-#terrain-toggle {
+#debug-toggle {
     min-width: 84px;
     min-height: 42px;
     padding: 0 14px;

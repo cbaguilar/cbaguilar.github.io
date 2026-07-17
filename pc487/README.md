@@ -16,11 +16,4 @@ Then open:
 http://localhost:8000/pc487/
 ```
 
-The first version is intentionally no-build: `index.html` loads BabylonJS from the CDN and the local source files use browser-native ES modules.
-
-The current terrain presets are procedural stand-ins for the supplied Inland Empire heightmap screenshots:
-
-- `34_235_-117_492_13_505_505_16bit.png`
-- `34_044_-117_414_10_505_505_16bit.png`
-
-When the source heightmap images are available in the repo, place them under `pc487/assets/heightmaps/` and replace the samplers in `src/engine/terrain.js` with image-backed height sampling.
+The first version is intentionally no-build: `index.html` loads BabylonJS from the CDN and the local source files use browser-native ES modules. The current prototype uses a flat world plane so movement work stays fast.

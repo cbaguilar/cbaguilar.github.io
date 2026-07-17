@@ -469,10 +469,10 @@ Before committing:
 - [x] Add `pc487/styles.css` with full-screen canvas styles.
 - [x] Add `pc487/src/main.js`.
 - [x] Load BabylonJS from CDN.
-- [x] Render terrain, light, camera, and test mesh.
-- [ ] Add a simple player block.
-- [ ] Add keyboard movement.
-- [ ] Add follow camera.
+- [x] Render flat ground, light, camera, and test mesh.
+- [x] Add a simple player block.
+- [x] Add keyboard movement.
+- [x] Add follow camera.
 - [ ] Add a placeholder vehicle if the controller stabilizes quickly.
 - [ ] Add `pc487/README.md` with local dev commands.
 
