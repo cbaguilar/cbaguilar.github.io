@@ -465,11 +465,11 @@ Before committing:
 ## Near-Term Task List
 
 - [x] Write implementation plan.
-- [ ] Add minimal `pc487/index.html`.
-- [ ] Add `pc487/styles.css` with full-screen canvas styles.
-- [ ] Add `pc487/src/main.js`.
-- [ ] Load BabylonJS from CDN.
-- [ ] Render a ground plane, light, camera, and test mesh.
+- [x] Add minimal `pc487/index.html`.
+- [x] Add `pc487/styles.css` with full-screen canvas styles.
+- [x] Add `pc487/src/main.js`.
+- [x] Load BabylonJS from CDN.
+- [x] Render terrain, light, camera, and test mesh.
 - [ ] Add a simple player block.
 - [ ] Add keyboard movement.
 - [ ] Add follow camera.

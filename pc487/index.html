@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC487</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+</head>
+<body>
+    <main id="game-shell" aria-label="PC487 game prototype">
+        <canvas id="render-canvas"></canvas>
+        <section id="hud" aria-label="Game status">
+            <div>
+                <p class="eyebrow">PC487</p>
+                <h1>Rendering Spike</h1>
+            </div>
+            <div class="hud-actions">
+                <button id="terrain-toggle" type="button">Terrain B</button>
+                <button id="debug-toggle" type="button" aria-pressed="false">Debug</button>
+            </div>
+        </section>
+        <noscript>
+            <p class="noscript">PC487 needs JavaScript enabled to run.</p>
+        </noscript>
+    </main>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
