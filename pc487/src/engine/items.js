@@ -1,7 +1,7 @@
 const PICKUP_DISTANCE = 3.2;
 const PICKUP_BOB_SPEED = 3.8;
 
-export function createItemSystem({ scene, playerController, onInventoryChange, onPromptChange }) {
+export function createItemSystem({ scene, playerController, audioSystem, onInventoryChange, onPromptChange }) {
     const input = createInputState();
     const inventory = [];
     const pickups = [
@@ -9,13 +9,16 @@ export function createItemSystem({ scene, playerController, onInventoryChange, o
     ];
 
     const observer = scene.onBeforeRenderObservable.add(() => {
-        updatePickups({ playerController, pickups, input, inventory, onInventoryChange, onPromptChange });
+        updatePickups({ playerController, audioSystem, pickups, input, inventory, onInventoryChange, onPromptChange });
     });
 
     onInventoryChange([...inventory]);
 
     return {
         inventory,
+        hasItem(itemId) {
+            return inventory.some((item) => item.id === itemId);
+        },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
             input.dispose();
@@ -52,7 +55,7 @@ function createGunPickup(scene, position) {
     };
 }
 
-function updatePickups({ playerController, pickups, input, inventory, onInventoryChange, onPromptChange }) {
+function updatePickups({ playerController, audioSystem, pickups, input, inventory, onInventoryChange, onPromptChange }) {
     if (!playerController.active) {
         onPromptChange("");
         input.consumePickup();
@@ -81,6 +84,7 @@ function updatePickups({ playerController, pickups, input, inventory, onInventor
     nearbyPickup.mesh.setEnabled(false);
     inventory.push({ id: nearbyPickup.id, label: nearbyPickup.label });
     playerController.equipItem(nearbyPickup.id);
+    audioSystem.playEquipGun();
     onInventoryChange([...inventory]);
     onPromptChange(`Picked up ${nearbyPickup.label}`);
 }

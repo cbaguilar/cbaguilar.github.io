@@ -1,9 +1,12 @@
+import { createCombatSystem } from "./combat.js";
+import { createAudioSystem } from "./audio.js";
 import { createItemSystem } from "./items.js";
 import { createNpcSystem } from "./npcs.js";
 import { createPlayerController } from "./player.js";
 import { createVehicleController } from "./vehicle.js";
 
 const WORLD_SIZE = 180;
+let promptHoldUntil = 0;
 
 export function createPc487App({ canvas }) {
     if (!canvas) {
@@ -54,6 +57,7 @@ export function createPc487App({ canvas }) {
     function dispose() {
         window.removeEventListener("resize", resize);
         sceneState.dispose();
+        sceneState.combatSystem.dispose();
         sceneState.npcSystem.dispose();
         sceneState.itemSystem.dispose();
         sceneState.playerController.dispose();
@@ -113,8 +117,10 @@ function createScene(engine, canvas) {
         camera,
         playerController: null,
         vehicleController: null,
+        audioSystem: null,
         itemSystem: null,
         npcSystem: null,
+        combatSystem: null,
         dispose: null,
         roads: [],
         buildings: [],
@@ -123,13 +129,23 @@ function createScene(engine, canvas) {
     createFlatGround(scene);
     sceneState.roads = createRoadGrid(scene);
     sceneState.buildings = createBlockoutBuildings(scene);
+    sceneState.audioSystem = createAudioSystem();
     sceneState.playerController = createPlayerController({ scene, camera });
     sceneState.vehicleController = createVehicleController({ scene });
     sceneState.npcSystem = createNpcSystem({ scene });
     sceneState.itemSystem = createItemSystem({
         scene,
         playerController: sceneState.playerController,
+        audioSystem: sceneState.audioSystem,
         onInventoryChange: updateInventoryHud,
+        onPromptChange: updateInteractionPrompt,
+    });
+    sceneState.combatSystem = createCombatSystem({
+        scene,
+        playerController: sceneState.playerController,
+        itemSystem: sceneState.itemSystem,
+        npcSystem: sceneState.npcSystem,
+        audioSystem: sceneState.audioSystem,
         onPromptChange: updateInteractionPrompt,
     });
     camera.lockedTarget = sceneState.playerController.mesh;
@@ -150,10 +166,16 @@ function updateInventoryHud(inventory) {
         : "Empty";
 }
 
-function updateInteractionPrompt(message) {
+function updateInteractionPrompt(message, options = {}) {
     const prompt = document.querySelector("#interaction-prompt");
 
     if (!prompt) {
+        return;
+    }
+
+    if (options.holdMs) {
+        promptHoldUntil = performance.now() + options.holdMs;
+    } else if (!message && performance.now() < promptHoldUntil) {
         return;
     }
 

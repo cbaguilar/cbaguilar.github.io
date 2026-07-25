@@ -6,6 +6,7 @@ const WORLD_LIMIT = 86;
 const PLAYER_MODEL_PATH = "assets/models/";
 const PLAYER_MODEL_FILE = "player.glb";
 const WALK_CYCLE_SPEED = 9;
+const SHOOT_POSE_SECONDS = 0.16;
 
 export function createPlayerController({ scene, camera }) {
     const mesh = createPlayerMesh(scene);
@@ -29,6 +30,9 @@ export function createPlayerController({ scene, camera }) {
         },
         equipItem(itemId) {
             equipItem({ scene, playerModel: mesh.metadata, itemId });
+        },
+        playShootAnimation() {
+            mesh.metadata.shootPoseTime = SHOOT_POSE_SECONDS;
         },
         setActive(nextActive) {
             active = nextActive;
@@ -145,6 +149,7 @@ function createBlockHumanoid(scene, parent) {
         rightHandSocket,
         equippedMesh: null,
         walkTime: 0,
+        shootPoseTime: 0,
     };
 }
 
@@ -275,6 +280,8 @@ function updateBlockHumanoid(playerModel, movement, deltaSeconds) {
         return;
     }
 
+    playerModel.shootPoseTime = Math.max(0, playerModel.shootPoseTime - deltaSeconds);
+
     const speed = Math.hypot(movement.x, movement.z);
     const moveAmount = Math.min(speed / 13, 1);
 
@@ -292,10 +299,17 @@ function updateBlockHumanoid(playerModel, movement, deltaSeconds) {
     playerModel.leftLeg.rotation.x = stride * 0.48;
     playerModel.rightLeg.rotation.x = counterStride * 0.48;
 
+    if (playerModel.shootPoseTime > 0) {
+        playerModel.rightArm.rotation.x = -1.15;
+        playerModel.rightArm.rotation.z = -0.16;
+    } else {
+        playerModel.rightArm.rotation.z = 0;
+    }
+
     if (moveAmount < 0.02) {
         playerModel.torso.rotation.x *= 0.8;
         playerModel.leftArm.rotation.x *= 0.8;
-        playerModel.rightArm.rotation.x *= 0.8;
+        playerModel.rightArm.rotation.x *= playerModel.shootPoseTime > 0 ? 1 : 0.8;
         playerModel.leftLeg.rotation.x *= 0.8;
         playerModel.rightLeg.rotation.x *= 0.8;
     }

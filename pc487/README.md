@@ -35,4 +35,5 @@ If that file is missing, it falls back to a simple block humanoid. See `docs/mod
 - `WASD`: move on foot or drive.
 - `E`: enter or exit the nearby vehicle.
 - `F`: pick up a nearby item.
+- Left click or `Space`: shoot the equipped pistol.
 - Mouse drag: orbit the follow camera.

@@ -1,5 +1,6 @@
 const NPC_HEIGHT = 2;
 const NPC_HALF_HEIGHT = NPC_HEIGHT / 2;
+const NPC_MAX_HEALTH = 100;
 const WALK_CYCLE_SPEED = 5.5;
 
 export function createNpcSystem({ scene }) {
@@ -40,6 +41,12 @@ export function createNpcSystem({ scene }) {
 
     return {
         npcs,
+        findTarget({ origin, direction, range, minDot }) {
+            return findNpcTarget({ npcs, origin, direction, range, minDot });
+        },
+        damageNpc(npc, damage) {
+            return damageNpc(npc, damage);
+        },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
 
@@ -65,15 +72,39 @@ function createNpc(scene, spec) {
     proxy.rotation.y = BABYLON.Tools.ToRadians(spec.rotation);
 
     const model = createBlockHumanoid(scene, proxy, spec);
+    const healthBar = createHealthBar(scene, proxy, spec.name);
 
     return {
         proxy,
         model,
+        healthBar,
         origin: proxy.position.clone(),
+        health: NPC_MAX_HEALTH,
+        maxHealth: NPC_MAX_HEALTH,
+        defeated: false,
         wanderRadius: spec.wanderRadius,
         wanderSpeed: spec.wanderSpeed,
         walkTime: Math.random() * Math.PI * 2,
         pathTime: Math.random() * Math.PI * 2,
+    };
+}
+
+function createHealthBar(scene, parent, name) {
+    const root = new BABYLON.TransformNode(`${name}HealthBar`, scene);
+    root.parent = parent;
+    root.position.set(0, 1.75, 0);
+
+    const backMaterial = makeMaterial(scene, `${name}HealthBack`, 0.08, 0.08, 0.08);
+    const fillMaterial = makeMaterial(scene, `${name}HealthFill`, 0.2, 0.85, 0.18);
+
+    const back = addBodyBox(scene, root, `${name}HealthBack`, { width: 1.08, height: 0.1, depth: 0.08 }, [0, 0, 0], backMaterial);
+    const fill = addBodyBox(scene, root, `${name}HealthFill`, { width: 1, height: 0.12, depth: 0.1 }, [0, 0.01, -0.01], fillMaterial);
+
+    return {
+        root,
+        back,
+        fill,
+        fillMaterial,
     };
 }
 
@@ -131,6 +162,12 @@ function createLeg(scene, parent, name, position, pantsMaterial, shoeMaterial) {
 }
 
 function updateNpc(npc, deltaSeconds) {
+    if (npc.defeated) {
+        npc.model.root.rotation.z = approach(npc.model.root.rotation.z, BABYLON.Tools.ToRadians(82), deltaSeconds * 4);
+        npc.healthBar.root.setEnabled(false);
+        return;
+    }
+
     npc.pathTime += deltaSeconds * npc.wanderSpeed;
 
     const nextX = npc.origin.x + Math.sin(npc.pathTime * 0.65) * npc.wanderRadius;
@@ -149,6 +186,73 @@ function updateNpc(npc, deltaSeconds) {
 
     npc.walkTime += deltaSeconds * WALK_CYCLE_SPEED;
     animateHumanoid(npc.model, npc.walkTime, Math.min(speed * 12, 1));
+    updateHealthBar(npc);
+}
+
+function findNpcTarget({ npcs, origin, direction, range, minDot }) {
+    let bestHit = null;
+
+    for (const npc of npcs) {
+        if (npc.defeated) {
+            continue;
+        }
+
+        const target = npc.proxy.position.add(new BABYLON.Vector3(0, 0.85, 0));
+        const toTarget = target.subtract(origin);
+        const distance = toTarget.length();
+
+        if (distance > range || distance < 0.001) {
+            continue;
+        }
+
+        toTarget.normalize();
+        const aimDot = BABYLON.Vector3.Dot(direction, toTarget);
+
+        if (aimDot < minDot) {
+            continue;
+        }
+
+        if (!bestHit || distance < bestHit.distance) {
+            bestHit = {
+                npc,
+                distance,
+                aimDot,
+            };
+        }
+    }
+
+    return bestHit;
+}
+
+function damageNpc(npc, damage) {
+    if (npc.defeated) {
+        return {
+            health: 0,
+            defeated: true,
+        };
+    }
+
+    npc.health = Math.max(0, npc.health - damage);
+    npc.defeated = npc.health <= 0;
+    updateHealthBar(npc);
+
+    if (npc.defeated) {
+        npc.healthBar.root.setEnabled(false);
+    }
+
+    return {
+        health: npc.health,
+        defeated: npc.defeated,
+    };
+}
+
+function updateHealthBar(npc) {
+    const healthRatio = npc.health / npc.maxHealth;
+    npc.healthBar.fill.scaling.x = Math.max(0.001, healthRatio);
+    npc.healthBar.fill.position.x = -0.5 * (1 - healthRatio);
+    npc.healthBar.fillMaterial.diffuseColor = healthRatio > 0.45
+        ? new BABYLON.Color3(0.2, 0.85, 0.18)
+        : new BABYLON.Color3(0.9, 0.18, 0.1);
 }
 
 function animateHumanoid(model, walkTime, moveAmount) {
@@ -162,6 +266,14 @@ function animateHumanoid(model, walkTime, moveAmount) {
     model.rightArm.rotation.x = stride * 0.48;
     model.leftLeg.rotation.x = stride * 0.36;
     model.rightLeg.rotation.x = counterStride * 0.36;
+}
+
+function approach(value, target, amount) {
+    if (value < target) {
+        return Math.min(value + amount, target);
+    }
+
+    return Math.max(value - amount, target);
 }
 
 function addBodyBox(scene, parent, name, size, position, material) {
