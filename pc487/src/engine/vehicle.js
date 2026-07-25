@@ -6,6 +6,8 @@ export function createVehicleController({ scene }) {
     const input = createInputState();
     const movement = {
         speed: 0,
+        steeringAngle: 0,
+        wheelSpin: 0,
         active: false,
     };
 
@@ -31,6 +33,7 @@ export function createVehicleController({ scene }) {
         exit(playerMesh) {
             movement.active = false;
             movement.speed = 0;
+            movement.steeringAngle = 0;
             const exitOffset = getForward(mesh).scale(-4.8).add(getRight(mesh).scale(3.2));
             playerMesh.position.set(
                 clamp(mesh.position.x + exitOffset.x, -WORLD_LIMIT, WORLD_LIMIT),
@@ -128,18 +131,26 @@ function createVehicleMesh(scene) {
     }
 
     const wheelSpecs = [
-        [-2.05, -0.42, 3.75],
-        [2.05, -0.42, 3.75],
-        [-2.05, -0.42, -1.9],
-        [2.05, -0.42, -1.9],
-        [-2.05, -0.42, -3.05],
-        [2.05, -0.42, -3.05],
+        { position: [-2.05, -0.42, 3.75], steers: true },
+        { position: [2.05, -0.42, 3.75], steers: true },
+        { position: [-2.05, -0.42, -1.9], steers: false },
+        { position: [2.05, -0.42, -1.9], steers: false },
+        { position: [-2.05, -0.42, -3.05], steers: false },
+        { position: [2.05, -0.42, -3.05], steers: false },
     ];
 
-    for (const [x, y, z] of wheelSpecs) {
+    const wheels = [];
+
+    for (const spec of wheelSpecs) {
         const wheel = createWheel(scene, root, tireMaterial, rimMaterial);
-        wheel.position.set(x, y, z);
+        wheel.root.position.set(spec.position[0], spec.position[1], spec.position[2]);
+        wheel.steers = spec.steers;
+        wheels.push(wheel);
     }
+
+    root.metadata = {
+        wheels,
+    };
 
     return root;
 }
@@ -200,7 +211,12 @@ function createWheel(scene, parent, tireMaterial, rimMaterial) {
     rim.rotation.z = Math.PI / 2;
     rim.material = rimMaterial;
 
-    return wheelRoot;
+    return {
+        root: wheelRoot,
+        tire,
+        rim,
+        steers: false,
+    };
 }
 
 function createInputState() {
@@ -233,15 +249,24 @@ function createInputState() {
 
 function updateVehicle({ mesh, input, movement, deltaSeconds }) {
     if (!movement.active) {
+        updateWheelVisuals(mesh, movement);
         return;
     }
 
-    const acceleration = 20;
-    const brakeDrag = 15;
-    const rollingDrag = 2.2;
-    const maxForward = 26;
-    const maxReverse = -9;
-    const turnRate = 1.25;
+    const acceleration = 15;
+    const brakeDrag = 18;
+    const rollingDrag = 1.7;
+    const maxForward = 24;
+    const maxReverse = -8;
+    const maxSteeringAngle = BABYLON.Tools.ToRadians(32);
+    const steeringReturnRate = BABYLON.Tools.ToRadians(95);
+    const steeringTurnRate = BABYLON.Tools.ToRadians(115);
+    const wheelBase = 6.9;
+    const wheelRadius = 0.48;
+
+    const targetSteeringAngle = input.steering * maxSteeringAngle;
+    const steeringRate = input.steering === 0 ? steeringReturnRate : steeringTurnRate;
+    movement.steeringAngle = approach(movement.steeringAngle, targetSteeringAngle, steeringRate * deltaSeconds);
 
     movement.speed += input.throttle * acceleration * deltaSeconds;
 
@@ -255,13 +280,28 @@ function updateVehicle({ mesh, input, movement, deltaSeconds }) {
 
     movement.speed = clamp(movement.speed, maxReverse, maxForward);
 
-    const speedFactor = Math.min(Math.abs(movement.speed) / maxForward, 1);
-    mesh.rotation.y += input.steering * turnRate * speedFactor * Math.sign(movement.speed || 1) * deltaSeconds;
+    if (Math.abs(movement.speed) > 0.02 && Math.abs(movement.steeringAngle) > 0.001) {
+        const yawRate = (movement.speed / wheelBase) * Math.tan(movement.steeringAngle);
+        mesh.rotation.y += yawRate * deltaSeconds;
+    }
 
     const forward = getForward(mesh);
     mesh.position.x = clamp(mesh.position.x + forward.x * movement.speed * deltaSeconds, -WORLD_LIMIT, WORLD_LIMIT);
     mesh.position.z = clamp(mesh.position.z + forward.z * movement.speed * deltaSeconds, -WORLD_LIMIT, WORLD_LIMIT);
     mesh.position.y = 0.8;
+
+    movement.wheelSpin += (movement.speed / wheelRadius) * deltaSeconds;
+    updateWheelVisuals(mesh, movement);
+}
+
+function updateWheelVisuals(mesh, movement) {
+    const wheels = mesh.metadata?.wheels ?? [];
+
+    for (const wheel of wheels) {
+        wheel.root.rotation.y = wheel.steers ? movement.steeringAngle : 0;
+        wheel.tire.rotation.x = movement.wheelSpin;
+        wheel.rim.rotation.x = movement.wheelSpin;
+    }
 }
 
 function getForward(mesh) {
