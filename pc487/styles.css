@@ -76,12 +76,31 @@ h1 {
     line-height: 1.1;
 }
 
+.hud-note {
+    min-height: 1.25rem;
+    margin: 8px 0 0;
+    color: var(--fg);
+    font-size: 0.92rem;
+    line-height: 1.25;
+}
+
 .hud-actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
     pointer-events: auto;
+}
+
+#inventory-panel {
+    min-width: 116px;
+}
+
+#inventory-slot {
+    margin: 0;
+    color: var(--fg);
+    font-size: 0.95rem;
+    font-weight: 650;
 }
 
 #debug-toggle {

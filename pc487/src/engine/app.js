@@ -1,3 +1,5 @@
+import { createItemSystem } from "./items.js";
+import { createNpcSystem } from "./npcs.js";
 import { createPlayerController } from "./player.js";
 import { createVehicleController } from "./vehicle.js";
 
@@ -52,6 +54,8 @@ export function createPc487App({ canvas }) {
     function dispose() {
         window.removeEventListener("resize", resize);
         sceneState.dispose();
+        sceneState.npcSystem.dispose();
+        sceneState.itemSystem.dispose();
         sceneState.playerController.dispose();
         sceneState.vehicleController.dispose();
         scene.dispose();
@@ -109,6 +113,8 @@ function createScene(engine, canvas) {
         camera,
         playerController: null,
         vehicleController: null,
+        itemSystem: null,
+        npcSystem: null,
         dispose: null,
         roads: [],
         buildings: [],
@@ -119,10 +125,39 @@ function createScene(engine, canvas) {
     sceneState.buildings = createBlockoutBuildings(scene);
     sceneState.playerController = createPlayerController({ scene, camera });
     sceneState.vehicleController = createVehicleController({ scene });
+    sceneState.npcSystem = createNpcSystem({ scene });
+    sceneState.itemSystem = createItemSystem({
+        scene,
+        playerController: sceneState.playerController,
+        onInventoryChange: updateInventoryHud,
+        onPromptChange: updateInteractionPrompt,
+    });
     camera.lockedTarget = sceneState.playerController.mesh;
     sceneState.dispose = createInteractionController(sceneState);
 
     return sceneState;
+}
+
+function updateInventoryHud(inventory) {
+    const inventorySlot = document.querySelector("#inventory-slot");
+
+    if (!inventorySlot) {
+        return;
+    }
+
+    inventorySlot.textContent = inventory.length > 0
+        ? inventory.map((item) => item.label).join(", ")
+        : "Empty";
+}
+
+function updateInteractionPrompt(message) {
+    const prompt = document.querySelector("#interaction-prompt");
+
+    if (!prompt) {
+        return;
+    }
+
+    prompt.textContent = message;
 }
 
 function createInteractionController(sceneState) {
