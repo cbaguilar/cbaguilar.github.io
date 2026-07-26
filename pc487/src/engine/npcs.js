@@ -1,9 +1,12 @@
 const NPC_HEIGHT = 2;
 const NPC_HALF_HEIGHT = NPC_HEIGHT / 2;
 const NPC_MAX_HEALTH = 100;
+const NPC_COLLISION_RADIUS = 0.48;
 const WALK_CYCLE_SPEED = 5.5;
+const KNOCKBACK_DRAG = 4.2;
+const DEFEATED_DRAG = 1.8;
 
-export function createNpcSystem({ scene }) {
+export function createNpcSystem({ scene, collisionWorld }) {
     const npcs = [
         createNpc(scene, {
             name: "npcWarehouseWorker",
@@ -35,7 +38,7 @@ export function createNpcSystem({ scene }) {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
 
         for (const npc of npcs) {
-            updateNpc(npc, deltaSeconds);
+            updateNpc(npc, collisionWorld, deltaSeconds);
         }
     });
 
@@ -46,6 +49,9 @@ export function createNpcSystem({ scene }) {
         },
         damageNpc(npc, damage) {
             return damageNpc(npc, damage);
+        },
+        applyImpulseToNpc(npc, impulse) {
+            applyImpulseToNpc(npc, impulse);
         },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
@@ -82,6 +88,7 @@ function createNpc(scene, spec) {
         health: NPC_MAX_HEALTH,
         maxHealth: NPC_MAX_HEALTH,
         defeated: false,
+        velocity: new BABYLON.Vector3(),
         wanderRadius: spec.wanderRadius,
         wanderSpeed: spec.wanderSpeed,
         walkTime: Math.random() * Math.PI * 2,
@@ -161,10 +168,19 @@ function createLeg(scene, parent, name, position, pantsMaterial, shoeMaterial) {
     return legRoot;
 }
 
-function updateNpc(npc, deltaSeconds) {
+function updateNpc(npc, collisionWorld, deltaSeconds) {
     if (npc.defeated) {
+        integrateNpcVelocity(npc, collisionWorld, deltaSeconds, DEFEATED_DRAG);
         npc.model.root.rotation.z = approach(npc.model.root.rotation.z, BABYLON.Tools.ToRadians(82), deltaSeconds * 4);
         npc.healthBar.root.setEnabled(false);
+        return;
+    }
+
+    if (npc.velocity.lengthSquared() > 0.01) {
+        integrateNpcVelocity(npc, collisionWorld, deltaSeconds, KNOCKBACK_DRAG);
+        npc.walkTime += deltaSeconds * WALK_CYCLE_SPEED;
+        animateHumanoid(npc.model, npc.walkTime, 0.15);
+        updateHealthBar(npc);
         return;
     }
 
@@ -176,9 +192,18 @@ function updateNpc(npc, deltaSeconds) {
     const deltaZ = nextZ - npc.proxy.position.z;
     const speed = Math.hypot(deltaX, deltaZ);
 
+    const previousPosition = npc.proxy.position.clone();
     npc.proxy.position.x = nextX;
     npc.proxy.position.z = nextZ;
+    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, NPC_COLLISION_RADIUS);
+    const collided = resolvedPosition.x !== npc.proxy.position.x || resolvedPosition.z !== npc.proxy.position.z;
+    npc.proxy.position.x = resolvedPosition.x;
+    npc.proxy.position.z = resolvedPosition.z;
     npc.proxy.position.y = NPC_HALF_HEIGHT;
+
+    if (collided) {
+        npc.pathTime += 1.2;
+    }
 
     if (speed > 0.0001) {
         npc.proxy.rotation.y = Math.atan2(deltaX, deltaZ);
@@ -187,6 +212,31 @@ function updateNpc(npc, deltaSeconds) {
     npc.walkTime += deltaSeconds * WALK_CYCLE_SPEED;
     animateHumanoid(npc.model, npc.walkTime, Math.min(speed * 12, 1));
     updateHealthBar(npc);
+}
+
+function integrateNpcVelocity(npc, collisionWorld, deltaSeconds, drag) {
+    const previousPosition = npc.proxy.position.clone();
+    npc.proxy.position.x += npc.velocity.x * deltaSeconds;
+    npc.proxy.position.z += npc.velocity.z * deltaSeconds;
+
+    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, NPC_COLLISION_RADIUS);
+    const collided = resolvedPosition.x !== npc.proxy.position.x || resolvedPosition.z !== npc.proxy.position.z;
+    npc.proxy.position.x = resolvedPosition.x;
+    npc.proxy.position.z = resolvedPosition.z;
+    npc.proxy.position.y = NPC_HALF_HEIGHT;
+
+    if (collided) {
+        npc.velocity.scaleInPlace(0.18);
+    }
+
+    if (npc.velocity.lengthSquared() > 0.001) {
+        npc.proxy.rotation.y = Math.atan2(npc.velocity.x, npc.velocity.z);
+    }
+
+    const dragFactor = Math.exp(-drag * deltaSeconds);
+    npc.velocity.scaleInPlace(dragFactor);
+    npc.origin.x += (npc.proxy.position.x - npc.origin.x) * 0.04;
+    npc.origin.z += (npc.proxy.position.z - npc.origin.z) * 0.04;
 }
 
 function findNpcTarget({ npcs, origin, direction, range, minDot }) {
@@ -244,6 +294,16 @@ function damageNpc(npc, damage) {
         health: npc.health,
         defeated: npc.defeated,
     };
+}
+
+function applyImpulseToNpc(npc, impulse) {
+    npc.velocity.x += impulse.x;
+    npc.velocity.z += impulse.z;
+    npc.pathTime += 1.5;
+
+    if (impulse.lengthSquared() > 0.0001) {
+        npc.proxy.rotation.y = Math.atan2(impulse.x, impulse.z);
+    }
 }
 
 function updateHealthBar(npc) {

@@ -1,7 +1,8 @@
 const WORLD_LIMIT = 86;
 const ENTER_DISTANCE = 7;
+const VEHICLE_COLLISION_RADIUS = 4.25;
 
-export function createVehicleController({ scene }) {
+export function createVehicleController({ scene, collisionWorld }) {
     const mesh = createVehicleMesh(scene);
     const input = createInputState();
     const movement = {
@@ -16,13 +17,22 @@ export function createVehicleController({ scene }) {
 
     const observer = scene.onBeforeRenderObservable.add(() => {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-        updateVehicle({ mesh, input, movement, deltaSeconds });
+        updateVehicle({ mesh, collisionWorld, input, movement, deltaSeconds });
     });
 
     return {
         mesh,
         get active() {
             return movement.active;
+        },
+        get speed() {
+            return movement.speed;
+        },
+        get forward() {
+            return getForward(mesh);
+        },
+        applyImpactSlowdown(multiplier) {
+            movement.speed *= multiplier;
         },
         canEnter(playerMesh) {
             return BABYLON.Vector3.Distance(playerMesh.position, mesh.position) <= ENTER_DISTANCE;
@@ -247,7 +257,7 @@ function createInputState() {
     };
 }
 
-function updateVehicle({ mesh, input, movement, deltaSeconds }) {
+function updateVehicle({ mesh, collisionWorld, input, movement, deltaSeconds }) {
     if (!movement.active) {
         updateWheelVisuals(mesh, movement);
         return;
@@ -286,9 +296,18 @@ function updateVehicle({ mesh, input, movement, deltaSeconds }) {
     }
 
     const forward = getForward(mesh);
+    const previousPosition = mesh.position.clone();
     mesh.position.x = clamp(mesh.position.x + forward.x * movement.speed * deltaSeconds, -WORLD_LIMIT, WORLD_LIMIT);
     mesh.position.z = clamp(mesh.position.z + forward.z * movement.speed * deltaSeconds, -WORLD_LIMIT, WORLD_LIMIT);
+    const resolvedPosition = collisionWorld.resolveCircleMovement(mesh.position, previousPosition, VEHICLE_COLLISION_RADIUS);
+    const collided = resolvedPosition.x !== mesh.position.x || resolvedPosition.z !== mesh.position.z;
+    mesh.position.x = resolvedPosition.x;
+    mesh.position.z = resolvedPosition.z;
     mesh.position.y = 0.8;
+
+    if (collided) {
+        movement.speed *= -0.18;
+    }
 
     movement.wheelSpin += (movement.speed / wheelRadius) * deltaSeconds;
     updateWheelVisuals(mesh, movement);

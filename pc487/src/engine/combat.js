@@ -37,9 +37,9 @@ function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSys
     state.cooldown = Math.max(0, state.cooldown - deltaSeconds);
     state.messageTime = Math.max(0, state.messageTime - deltaSeconds);
 
-    const shootRequested = input.consumeShoot();
+    const shootRequest = input.consumeShoot();
 
-    if (!shootRequested) {
+    if (!shootRequest) {
         return;
     }
 
@@ -58,10 +58,19 @@ function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSys
     }
 
     state.cooldown = PISTOL_COOLDOWN_SECONDS;
+
+    if (shootRequest.pointer) {
+        const aimPoint = getGroundAimPoint(scene, shootRequest.pointer.x, shootRequest.pointer.y);
+
+        if (aimPoint) {
+            playerController.facePoint(aimPoint);
+        }
+    }
+
     playerController.playShootAnimation();
     audioSystem.playGunshot();
 
-    const shot = getShotVector(playerController.mesh);
+    const shot = getShotVector(playerController);
     const hit = npcSystem.findTarget({
         origin: shot.origin,
         direction: shot.direction,
@@ -80,16 +89,39 @@ function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSys
         return;
     }
 
+    const wasDefeated = hit.npc.defeated;
     const result = npcSystem.damageNpc(hit.npc, PISTOL_DAMAGE);
+
+    if (!wasDefeated && result.defeated) {
+        audioSystem.playNpcKnockdown();
+    }
+
     showCombatMessage(onPromptChange, state, result.defeated ? "NPC down" : `Hit NPC (${result.health} HP)`);
 }
 
-function getShotVector(playerMesh) {
+function getGroundAimPoint(scene, screenX, screenY) {
+    const ray = scene.createPickingRay(screenX, screenY, BABYLON.Matrix.Identity(), scene.activeCamera);
+
+    if (Math.abs(ray.direction.y) < 0.0001) {
+        return null;
+    }
+
+    const distance = -ray.origin.y / ray.direction.y;
+
+    if (distance < 0) {
+        return null;
+    }
+
+    return ray.origin.add(ray.direction.scale(distance));
+}
+
+function getShotVector(playerController) {
+    const { mesh: playerMesh } = playerController;
     const direction = new BABYLON.Vector3(Math.sin(playerMesh.rotation.y), 0, Math.cos(playerMesh.rotation.y));
     direction.normalize();
 
     return {
-        origin: playerMesh.position.add(new BABYLON.Vector3(0, 1.35, 0)).add(direction.scale(0.8)),
+        origin: playerController.getMuzzlePosition(),
         direction,
     };
 }
@@ -123,7 +155,7 @@ function showCombatMessage(onPromptChange, state, message) {
 }
 
 function createInputState(canvas) {
-    let shootRequested = false;
+    let shootRequest = null;
 
     function requestShoot(event) {
         if (event.type === "keydown" && event.code !== "Space") {
@@ -135,7 +167,14 @@ function createInputState(canvas) {
         }
 
         event.preventDefault();
-        shootRequested = true;
+        shootRequest = event.type === "pointerdown"
+            ? {
+                pointer: {
+                    x: event.clientX,
+                    y: event.clientY,
+                },
+            }
+            : {};
     }
 
     window.addEventListener("keydown", requestShoot);
@@ -146,9 +185,9 @@ function createInputState(canvas) {
 
     return {
         consumeShoot() {
-            const requested = shootRequested;
-            shootRequested = false;
-            return requested;
+            const request = shootRequest;
+            shootRequest = null;
+            return request;
         },
         dispose() {
             window.removeEventListener("keydown", requestShoot);

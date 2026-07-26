@@ -1,11 +1,25 @@
 import { createCombatSystem } from "./combat.js";
 import { createAudioSystem } from "./audio.js";
+import { createCollisionWorld } from "./collision.js";
 import { createItemSystem } from "./items.js";
 import { createNpcSystem } from "./npcs.js";
 import { createPlayerController } from "./player.js";
 import { createVehicleController } from "./vehicle.js";
+import { createVehicleImpactSystem } from "./vehicleImpacts.js";
 
 const WORLD_SIZE = 180;
+const CAMERA_MODES = {
+    pedestrian: {
+        radius: 14,
+        lowerRadiusLimit: 9,
+        upperRadiusLimit: 20,
+    },
+    vehicle: {
+        radius: 34,
+        lowerRadiusLimit: 18,
+        upperRadiusLimit: 52,
+    },
+};
 let promptHoldUntil = 0;
 
 export function createPc487App({ canvas }) {
@@ -58,6 +72,8 @@ export function createPc487App({ canvas }) {
         window.removeEventListener("resize", resize);
         sceneState.dispose();
         sceneState.combatSystem.dispose();
+        sceneState.vehicleImpactSystem.dispose();
+        sceneState.vehicleAudioController.dispose();
         sceneState.npcSystem.dispose();
         sceneState.itemSystem.dispose();
         sceneState.playerController.dispose();
@@ -84,18 +100,18 @@ function createScene(engine, canvas) {
         "followCamera",
         BABYLON.Tools.ToRadians(45),
         BABYLON.Tools.ToRadians(68),
-        28,
+        CAMERA_MODES.pedestrian.radius,
         new BABYLON.Vector3(0, 1, 0),
         scene,
     );
-    camera.lowerRadiusLimit = 12;
-    camera.upperRadiusLimit = 48;
+    applyCameraMode(camera, "pedestrian");
     camera.lowerBetaLimit = BABYLON.Tools.ToRadians(35);
     camera.upperBetaLimit = BABYLON.Tools.ToRadians(82);
     camera.wheelDeltaPercentage = 0.01;
     camera.panningSensibility = 70;
     camera.attachControl(canvas, true);
     camera.inputs.remove(camera.inputs.attached.keyboard);
+    configureCameraPointerControls(camera, canvas);
 
     const sun = new BABYLON.DirectionalLight(
         "sun",
@@ -121,6 +137,9 @@ function createScene(engine, canvas) {
         itemSystem: null,
         npcSystem: null,
         combatSystem: null,
+        vehicleImpactSystem: null,
+        vehicleAudioController: null,
+        collisionWorld: null,
         dispose: null,
         roads: [],
         buildings: [],
@@ -129,10 +148,11 @@ function createScene(engine, canvas) {
     createFlatGround(scene);
     sceneState.roads = createRoadGrid(scene);
     sceneState.buildings = createBlockoutBuildings(scene);
+    sceneState.collisionWorld = createCollisionWorld(sceneState.buildings);
     sceneState.audioSystem = createAudioSystem();
-    sceneState.playerController = createPlayerController({ scene, camera });
-    sceneState.vehicleController = createVehicleController({ scene });
-    sceneState.npcSystem = createNpcSystem({ scene });
+    sceneState.playerController = createPlayerController({ scene, camera, collisionWorld: sceneState.collisionWorld });
+    sceneState.vehicleController = createVehicleController({ scene, collisionWorld: sceneState.collisionWorld });
+    sceneState.npcSystem = createNpcSystem({ scene, collisionWorld: sceneState.collisionWorld });
     sceneState.itemSystem = createItemSystem({
         scene,
         playerController: sceneState.playerController,
@@ -148,10 +168,107 @@ function createScene(engine, canvas) {
         audioSystem: sceneState.audioSystem,
         onPromptChange: updateInteractionPrompt,
     });
+    sceneState.vehicleImpactSystem = createVehicleImpactSystem({
+        scene,
+        vehicleController: sceneState.vehicleController,
+        npcSystem: sceneState.npcSystem,
+        audioSystem: sceneState.audioSystem,
+        onPromptChange: updateInteractionPrompt,
+    });
+    sceneState.vehicleAudioController = createVehicleAudioController(sceneState);
     camera.lockedTarget = sceneState.playerController.mesh;
     sceneState.dispose = createInteractionController(sceneState);
 
     return sceneState;
+}
+
+function configureCameraPointerControls(camera, canvas) {
+    const pointerInput = camera.inputs.attached.pointers;
+
+    if (pointerInput) {
+        camera.inputs.remove(pointerInput);
+    }
+
+    let dragging = false;
+    let pointerId = null;
+    let lastX = 0;
+    let lastY = 0;
+
+    canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 2) {
+            return;
+        }
+
+        event.preventDefault();
+        dragging = true;
+        pointerId = event.pointerId;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        canvas.setPointerCapture(pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+        if (!dragging || event.pointerId !== pointerId) {
+            return;
+        }
+
+        event.preventDefault();
+        const deltaX = event.clientX - lastX;
+        const deltaY = event.clientY - lastY;
+        lastX = event.clientX;
+        lastY = event.clientY;
+
+        camera.alpha -= deltaX / 220;
+        camera.beta = clamp(camera.beta - deltaY / 260, camera.lowerBetaLimit, camera.upperBetaLimit);
+    });
+
+    function stopDrag(event) {
+        if (!dragging || event.pointerId !== pointerId) {
+            return;
+        }
+
+        dragging = false;
+        canvas.releasePointerCapture(pointerId);
+        pointerId = null;
+    }
+
+    canvas.addEventListener("pointerup", stopDrag);
+    canvas.addEventListener("pointercancel", stopDrag);
+    canvas.addEventListener("wheel", (event) => {
+        event.preventDefault();
+        const zoomAmount = event.deltaY * 0.012;
+        camera.radius = clamp(camera.radius + zoomAmount, camera.lowerRadiusLimit, camera.upperRadiusLimit);
+    }, { passive: false });
+    canvas.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+    });
+}
+
+function applyCameraMode(camera, modeName) {
+    const mode = CAMERA_MODES[modeName];
+    camera.lowerRadiusLimit = mode.lowerRadiusLimit;
+    camera.upperRadiusLimit = mode.upperRadiusLimit;
+    camera.radius = clamp(camera.radius, mode.lowerRadiusLimit, mode.upperRadiusLimit);
+
+    if (camera.radius !== mode.radius) {
+        camera.radius = mode.radius;
+    }
+}
+
+function createVehicleAudioController(sceneState) {
+    const observer = sceneState.scene.onBeforeRenderObservable.add(() => {
+        sceneState.audioSystem.updateTruckEngine({
+            active: sceneState.vehicleController.active,
+            speed: sceneState.vehicleController.speed,
+        });
+    });
+
+    return {
+        dispose() {
+            sceneState.scene.onBeforeRenderObservable.remove(observer);
+            sceneState.audioSystem.updateTruckEngine({ active: false, speed: 0 });
+        },
+    };
 }
 
 function updateInventoryHud(inventory) {
@@ -192,7 +309,7 @@ function createInteractionController(sceneState) {
             sceneState.vehicleController.exit(sceneState.playerController.mesh);
             sceneState.playerController.setActive(true);
             sceneState.camera.lockedTarget = sceneState.playerController.mesh;
-            sceneState.camera.radius = 28;
+            applyCameraMode(sceneState.camera, "pedestrian");
             return;
         }
 
@@ -200,7 +317,7 @@ function createInteractionController(sceneState) {
             sceneState.playerController.setActive(false);
             sceneState.vehicleController.enter();
             sceneState.camera.lockedTarget = sceneState.vehicleController.mesh;
-            sceneState.camera.radius = 34;
+            applyCameraMode(sceneState.camera, "vehicle");
         }
     }
 
@@ -292,6 +409,10 @@ function createBlockoutBuildings(scene) {
         );
         building.position.set(spec.x, spec.height / 2, spec.z);
         building.material = materials[spec.material];
+        building.size = {
+            width: spec.width,
+            depth: spec.depth,
+        };
         meshes.push(building);
     }
 
@@ -303,4 +424,8 @@ function makeMaterial(scene, name, r, g, b) {
     material.diffuseColor = new BABYLON.Color3(r, g, b);
     material.specularColor = new BABYLON.Color3(0.04, 0.04, 0.04);
     return material;
+}
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }
