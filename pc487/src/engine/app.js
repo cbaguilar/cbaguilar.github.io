@@ -312,6 +312,9 @@ function createTestControls(sceneState) {
         fire() {
             window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
         },
+        get shotsFired() {
+            return sceneState.combatSystem.shotsFired;
+        },
     };
 }
 

@@ -8,6 +8,7 @@ export function createCombatSystem({ scene, playerController, vehicleController,
     const state = {
         cooldown: 0,
         messageTime: 0,
+        shotsFired: 0,
     };
 
     const observer = scene.onBeforeRenderObservable.add(() => {
@@ -27,6 +28,9 @@ export function createCombatSystem({ scene, playerController, vehicleController,
     });
 
     return {
+        get shotsFired() {
+            return state.shotsFired;
+        },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
             input.dispose();
@@ -54,6 +58,7 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
     }
 
     state.cooldown = PISTOL_COOLDOWN_SECONDS;
+    state.shotsFired += 1;
     const aimPoint = shootRequest.pointer
         ? getGroundAimPoint(scene, shootRequest.pointer.x, shootRequest.pointer.y)
         : null;
@@ -231,6 +236,12 @@ function createInputState(canvas) {
     let shootRequest = null;
     const mobileShootButton = document.querySelector("#mobile-shoot");
 
+    function requestMobileShoot(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        shootRequest = {};
+    }
+
     function requestShoot(event) {
         if (event.type === "keydown" && event.code !== "Space") {
             return;
@@ -240,14 +251,12 @@ function createInputState(canvas) {
             return;
         }
 
-        if (event.defaultPrevented || (event.currentTarget === canvas && event.pointerType === "touch")) {
+        if (event.currentTarget === canvas && event.pointerType === "touch") {
             return;
         }
 
         event.preventDefault();
-        shootRequest = event.currentTarget === mobileShootButton
-            ? {}
-            : event.type === "pointerdown"
+        shootRequest = event.type === "pointerdown"
             ? {
                 pointer: {
                     x: event.clientX,
@@ -263,7 +272,9 @@ function createInputState(canvas) {
         canvas.addEventListener("pointerdown", requestShoot);
     }
 
-    mobileShootButton?.addEventListener("pointerdown", requestShoot);
+    mobileShootButton?.addEventListener("pointerdown", requestMobileShoot);
+    mobileShootButton?.addEventListener("touchstart", requestMobileShoot, { passive: false });
+    mobileShootButton?.addEventListener("click", requestMobileShoot);
 
     return {
         consumeShoot() {
@@ -278,7 +289,9 @@ function createInputState(canvas) {
                 canvas.removeEventListener("pointerdown", requestShoot);
             }
 
-            mobileShootButton?.removeEventListener("pointerdown", requestShoot);
+            mobileShootButton?.removeEventListener("pointerdown", requestMobileShoot);
+            mobileShootButton?.removeEventListener("touchstart", requestMobileShoot);
+            mobileShootButton?.removeEventListener("click", requestMobileShoot);
         },
     };
 }
