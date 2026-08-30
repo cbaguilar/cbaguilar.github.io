@@ -231,16 +231,16 @@ function createWheel(scene, parent, tireMaterial, rimMaterial) {
 
 function createInputState() {
     const pressed = new Set();
-    const heldButtons = new Set();
-    const mobileButtons = [
-        { id: "drive-gas", action: "gas" },
-        { id: "drive-reverse", action: "reverse" },
-        { id: "drive-left", action: "left" },
-        { id: "drive-right", action: "right" },
-    ].map(({ id, action }) => ({
-        element: document.querySelector(`#${id}`),
-        action,
-    }));
+    const joystick = {
+        active: false,
+        pointerId: null,
+        centerX: 0,
+        centerY: 0,
+        throttle: 0,
+        steering: 0,
+    };
+    const joystickBase = document.querySelector("#move-joystick");
+    const joystickRadius = 52;
 
     function onKeyDown(event) {
         pressed.add(event.code);
@@ -250,67 +250,78 @@ function createInputState() {
         pressed.delete(event.code);
     }
 
-    function holdAction(action, element) {
-        heldButtons.add(action);
-        element.classList.add("is-held");
+    function updateJoystick(event) {
+        const rawX = event.clientX - joystick.centerX;
+        const rawY = event.clientY - joystick.centerY;
+        const distance = Math.hypot(rawX, rawY);
+        const scale = distance > joystickRadius ? joystickRadius / distance : 1;
+
+        joystick.steering = clamp((rawX * scale) / joystickRadius, -1, 1);
+        joystick.throttle = clamp((-rawY * scale) / joystickRadius, -1, 1);
     }
 
-    function releaseAction(action, element) {
-        heldButtons.delete(action);
-        element.classList.remove("is-held");
+    function resetJoystick() {
+        joystick.active = false;
+        joystick.pointerId = null;
+        joystick.throttle = 0;
+        joystick.steering = 0;
     }
 
-    function createPointerDownHandler(action, element) {
-        return function onPointerDown(event) {
-            holdAction(action, element);
-            element.setPointerCapture(event.pointerId);
-            event.preventDefault();
-        };
+    function onJoystickDown(event) {
+        const bounds = joystickBase.getBoundingClientRect();
+        joystick.active = true;
+        joystick.pointerId = event.pointerId;
+        joystick.centerX = bounds.left + bounds.width / 2;
+        joystick.centerY = bounds.top + bounds.height / 2;
+        updateJoystick(event);
     }
 
-    function createPointerEndHandler(action, element) {
-        return function onPointerEnd(event) {
-            releaseAction(action, element);
-            event.preventDefault();
-        };
+    function onJoystickMove(event) {
+        if (!joystick.active || event.pointerId !== joystick.pointerId) {
+            return;
+        }
+
+        updateJoystick(event);
     }
 
-    const mobileListeners = mobileButtons
-        .filter(({ element }) => element)
-        .map(({ element, action }) => {
-            const onPointerDown = createPointerDownHandler(action, element);
-            const onPointerEnd = createPointerEndHandler(action, element);
-            element.addEventListener("pointerdown", onPointerDown);
-            element.addEventListener("pointerup", onPointerEnd);
-            element.addEventListener("pointercancel", onPointerEnd);
-            element.addEventListener("lostpointercapture", onPointerEnd);
-            return { element, action, onPointerDown, onPointerEnd };
-        });
+    function onJoystickEnd(event) {
+        if (event.pointerId !== joystick.pointerId) {
+            return;
+        }
+
+        resetJoystick();
+    }
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
+    if (joystickBase) {
+        joystickBase.addEventListener("pointerdown", onJoystickDown);
+        joystickBase.addEventListener("pointermove", onJoystickMove);
+        joystickBase.addEventListener("pointerup", onJoystickEnd);
+        joystickBase.addEventListener("pointercancel", onJoystickEnd);
+        joystickBase.addEventListener("lostpointercapture", resetJoystick);
+    }
+
     return {
         get throttle() {
             const keyboardThrottle = Number(pressed.has("KeyW")) - Number(pressed.has("KeyS"));
-            const touchThrottle = Number(heldButtons.has("gas")) - Number(heldButtons.has("reverse"));
-            return clamp(keyboardThrottle + touchThrottle, -1, 1);
+            return clamp(keyboardThrottle + joystick.throttle, -1, 1);
         },
         get steering() {
             const keyboardSteering = Number(pressed.has("KeyD")) - Number(pressed.has("KeyA"));
-            const touchSteering = Number(heldButtons.has("right")) - Number(heldButtons.has("left"));
-            return clamp(keyboardSteering + touchSteering, -1, 1);
+            return clamp(keyboardSteering + joystick.steering, -1, 1);
         },
         dispose() {
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("keyup", onKeyUp);
 
-            for (const listener of mobileListeners) {
-                listener.element.removeEventListener("pointerdown", listener.onPointerDown);
-                listener.element.removeEventListener("pointerup", listener.onPointerEnd);
-                listener.element.removeEventListener("pointercancel", listener.onPointerEnd);
-                listener.element.removeEventListener("lostpointercapture", listener.onPointerEnd);
-                releaseAction(listener.action, listener.element);
+            if (joystickBase) {
+                joystickBase.removeEventListener("pointerdown", onJoystickDown);
+                joystickBase.removeEventListener("pointermove", onJoystickMove);
+                joystickBase.removeEventListener("pointerup", onJoystickEnd);
+                joystickBase.removeEventListener("pointercancel", onJoystickEnd);
+                joystickBase.removeEventListener("lostpointercapture", resetJoystick);
             }
         },
     };
