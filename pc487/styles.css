@@ -133,6 +133,16 @@ h1 {
     z-index: 2;
 }
 
+#camera-touch-zone {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 38%;
+    pointer-events: auto;
+    touch-action: none;
+}
+
 #move-joystick {
     position: absolute;
     left: 22px;
@@ -164,10 +174,26 @@ h1 {
     transition: transform 120ms ease;
 }
 
-#mobile-pickup {
+#mobile-shoot {
     position: absolute;
     right: 22px;
     bottom: max(30px, calc(env(safe-area-inset-bottom) + 6px));
+    width: 78px;
+    height: 78px;
+    border: 1px solid rgb(245 240 232 / 30%);
+    border-radius: 50%;
+    background: rgb(196 55 47 / 88%);
+    color: white;
+    font-size: 0.95rem;
+    font-weight: 900;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+#mobile-pickup {
+    position: absolute;
+    right: 112px;
+    bottom: max(40px, calc(env(safe-area-inset-bottom) + 16px));
     display: none;
     min-width: 104px;
     min-height: 58px;
@@ -188,7 +214,7 @@ h1 {
 #mobile-vehicle-action {
     position: absolute;
     right: 22px;
-    bottom: max(96px, calc(env(safe-area-inset-bottom) + 72px));
+    bottom: max(120px, calc(env(safe-area-inset-bottom) + 96px));
     display: none;
     min-width: 104px;
     min-height: 54px;
@@ -212,6 +238,10 @@ h1 {
 
 #game-shell.is-driving #mobile-vehicle-action {
     display: block;
+}
+
+#game-shell.is-driving #mobile-shoot {
+    bottom: max(40px, calc(env(safe-area-inset-bottom) + 16px));
 }
 
 .noscript {

@@ -242,11 +242,19 @@ function createMountedOfficer(scene, parent, spec) {
     addBodyBox(scene, horseRoot, `${spec.name}HorseMane`, { width: 0.12, height: 0.9, depth: 0.2 }, [0, 1.57, 0.88], horseMane);
     addBodyBox(scene, horseRoot, `${spec.name}HorseTail`, { width: 0.22, height: 0.22, depth: 0.86 }, [0, 1.06, -1.36], horseMane).rotation.x = BABYLON.Tools.ToRadians(-18);
 
+    const horseLegs = [];
+
     for (const [index, x] of [-0.38, 0.38].entries()) {
         for (const z of [-0.68, 0.72]) {
+            const baseRotation = BABYLON.Tools.ToRadians(z > 0 ? -4 : 5);
             const leg = addBodyBox(scene, horseRoot, `${spec.name}HorseLeg${index}${z}`, { width: 0.22, height: 0.88, depth: 0.24 }, [x, 0.3, z], horseBody);
-            leg.rotation.x = BABYLON.Tools.ToRadians(z > 0 ? -4 : 5);
+            leg.rotation.x = baseRotation;
             addBodyBox(scene, horseRoot, `${spec.name}HorseHoof${index}${z}`, { width: 0.3, height: 0.14, depth: 0.34 }, [x, -0.2, z + 0.03], black);
+            horseLegs.push({
+                leg,
+                baseRotation,
+                phase: (index === 0) === (z > 0) ? 0 : Math.PI,
+            });
         }
     }
 
@@ -294,6 +302,7 @@ function createMountedOfficer(scene, parent, spec) {
         leftLeg,
         rightLeg,
         horseRoot,
+        horseLegs,
         riderRoot,
         playerRiderRoot,
     };
@@ -489,6 +498,11 @@ function animateHorseRide(model, walkTime, moveAmount, steeringAngle) {
     model.root.rotation.z = 0;
     model.horseRoot.rotation.y = steeringAngle * 0.12;
     model.horseRoot.position.y = Math.abs(Math.sin(walkTime)) * 0.045 * moveAmount;
+
+    for (const horseLeg of model.horseLegs ?? []) {
+        horseLeg.leg.rotation.x = horseLeg.baseRotation + Math.sin(walkTime + horseLeg.phase) * 0.42 * moveAmount;
+        horseLeg.leg.rotation.z = Math.sin(walkTime + horseLeg.phase + Math.PI / 2) * 0.05 * moveAmount;
+    }
 
     if (model.playerRiderRoot) {
         model.playerRiderRoot.rotation.z = -steeringAngle * 0.18;

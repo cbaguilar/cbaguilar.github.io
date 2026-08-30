@@ -229,6 +229,7 @@ function showCombatMessage(onPromptChange, state, message) {
 
 function createInputState(canvas) {
     let shootRequest = null;
+    const mobileShootButton = document.querySelector("#mobile-shoot");
 
     function requestShoot(event) {
         if (event.type === "keydown" && event.code !== "Space") {
@@ -239,8 +240,14 @@ function createInputState(canvas) {
             return;
         }
 
+        if (event.defaultPrevented || (event.currentTarget === canvas && event.pointerType === "touch")) {
+            return;
+        }
+
         event.preventDefault();
-        shootRequest = event.type === "pointerdown"
+        shootRequest = event.currentTarget === mobileShootButton
+            ? {}
+            : event.type === "pointerdown"
             ? {
                 pointer: {
                     x: event.clientX,
@@ -256,6 +263,8 @@ function createInputState(canvas) {
         canvas.addEventListener("pointerdown", requestShoot);
     }
 
+    mobileShootButton?.addEventListener("pointerdown", requestShoot);
+
     return {
         consumeShoot() {
             const request = shootRequest;
@@ -268,6 +277,8 @@ function createInputState(canvas) {
             if (canvas) {
                 canvas.removeEventListener("pointerdown", requestShoot);
             }
+
+            mobileShootButton?.removeEventListener("pointerdown", requestShoot);
         },
     };
 }

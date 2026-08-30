@@ -186,6 +186,7 @@ function createScene(engine, canvas) {
 
 function configureCameraPointerControls(camera, canvas) {
     const pointerInput = camera.inputs.attached.pointers;
+    const touchZone = document.querySelector("#camera-touch-zone");
 
     if (pointerInput) {
         camera.inputs.remove(pointerInput);
@@ -196,20 +197,32 @@ function configureCameraPointerControls(camera, canvas) {
     let lastX = 0;
     let lastY = 0;
 
-    canvas.addEventListener("pointerdown", (event) => {
-        if (event.button !== 2) {
-            return;
-        }
-
+    function startDrag(event, target) {
         event.preventDefault();
         dragging = true;
         pointerId = event.pointerId;
         lastX = event.clientX;
         lastY = event.clientY;
-        canvas.setPointerCapture(pointerId);
+        target.setPointerCapture(pointerId);
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 2) {
+            return;
+        }
+
+        startDrag(event, canvas);
     });
 
-    canvas.addEventListener("pointermove", (event) => {
+    touchZone?.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse") {
+            return;
+        }
+
+        startDrag(event, touchZone);
+    });
+
+    function updateDrag(event) {
         if (!dragging || event.pointerId !== pointerId) {
             return;
         }
@@ -222,7 +235,10 @@ function configureCameraPointerControls(camera, canvas) {
 
         camera.alpha -= deltaX / 220;
         camera.beta = clamp(camera.beta - deltaY / 260, camera.lowerBetaLimit, camera.upperBetaLimit);
-    });
+    }
+
+    canvas.addEventListener("pointermove", updateDrag);
+    touchZone?.addEventListener("pointermove", updateDrag);
 
     function stopDrag(event) {
         if (!dragging || event.pointerId !== pointerId) {
@@ -230,12 +246,16 @@ function configureCameraPointerControls(camera, canvas) {
         }
 
         dragging = false;
-        canvas.releasePointerCapture(pointerId);
+        if (event.currentTarget.hasPointerCapture(pointerId)) {
+            event.currentTarget.releasePointerCapture(pointerId);
+        }
         pointerId = null;
     }
 
     canvas.addEventListener("pointerup", stopDrag);
     canvas.addEventListener("pointercancel", stopDrag);
+    touchZone?.addEventListener("pointerup", stopDrag);
+    touchZone?.addEventListener("pointercancel", stopDrag);
     canvas.addEventListener("wheel", (event) => {
         event.preventDefault();
         const zoomAmount = event.deltaY * 0.012;
