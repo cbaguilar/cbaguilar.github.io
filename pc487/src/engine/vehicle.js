@@ -231,6 +231,16 @@ function createWheel(scene, parent, tireMaterial, rimMaterial) {
 
 function createInputState() {
     const pressed = new Set();
+    const heldButtons = new Set();
+    const mobileButtons = [
+        { id: "drive-gas", action: "gas" },
+        { id: "drive-reverse", action: "reverse" },
+        { id: "drive-left", action: "left" },
+        { id: "drive-right", action: "right" },
+    ].map(({ id, action }) => ({
+        element: document.querySelector(`#${id}`),
+        action,
+    }));
 
     function onKeyDown(event) {
         pressed.add(event.code);
@@ -240,19 +250,68 @@ function createInputState() {
         pressed.delete(event.code);
     }
 
+    function holdAction(action, element) {
+        heldButtons.add(action);
+        element.classList.add("is-held");
+    }
+
+    function releaseAction(action, element) {
+        heldButtons.delete(action);
+        element.classList.remove("is-held");
+    }
+
+    function createPointerDownHandler(action, element) {
+        return function onPointerDown(event) {
+            holdAction(action, element);
+            element.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        };
+    }
+
+    function createPointerEndHandler(action, element) {
+        return function onPointerEnd(event) {
+            releaseAction(action, element);
+            event.preventDefault();
+        };
+    }
+
+    const mobileListeners = mobileButtons
+        .filter(({ element }) => element)
+        .map(({ element, action }) => {
+            const onPointerDown = createPointerDownHandler(action, element);
+            const onPointerEnd = createPointerEndHandler(action, element);
+            element.addEventListener("pointerdown", onPointerDown);
+            element.addEventListener("pointerup", onPointerEnd);
+            element.addEventListener("pointercancel", onPointerEnd);
+            element.addEventListener("lostpointercapture", onPointerEnd);
+            return { element, action, onPointerDown, onPointerEnd };
+        });
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
     return {
         get throttle() {
-            return Number(pressed.has("KeyW")) - Number(pressed.has("KeyS"));
+            const keyboardThrottle = Number(pressed.has("KeyW")) - Number(pressed.has("KeyS"));
+            const touchThrottle = Number(heldButtons.has("gas")) - Number(heldButtons.has("reverse"));
+            return clamp(keyboardThrottle + touchThrottle, -1, 1);
         },
         get steering() {
-            return Number(pressed.has("KeyD")) - Number(pressed.has("KeyA"));
+            const keyboardSteering = Number(pressed.has("KeyD")) - Number(pressed.has("KeyA"));
+            const touchSteering = Number(heldButtons.has("right")) - Number(heldButtons.has("left"));
+            return clamp(keyboardSteering + touchSteering, -1, 1);
         },
         dispose() {
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("keyup", onKeyUp);
+
+            for (const listener of mobileListeners) {
+                listener.element.removeEventListener("pointerdown", listener.onPointerDown);
+                listener.element.removeEventListener("pointerup", listener.onPointerEnd);
+                listener.element.removeEventListener("pointercancel", listener.onPointerEnd);
+                listener.element.removeEventListener("lostpointercapture", listener.onPointerEnd);
+                releaseAction(listener.action, listener.element);
+            }
         },
     };
 }

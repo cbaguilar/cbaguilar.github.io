@@ -300,31 +300,73 @@ function updateInteractionPrompt(message, options = {}) {
 }
 
 function createInteractionController(sceneState) {
+    const gameShell = document.querySelector("#game-shell");
+    const mobileVehicleButton = document.querySelector("#mobile-vehicle-action");
+
+    function enterVehicle() {
+        sceneState.playerController.setActive(false);
+        sceneState.vehicleController.enter();
+        sceneState.camera.lockedTarget = sceneState.vehicleController.mesh;
+        applyCameraMode(sceneState.camera, "vehicle");
+        gameShell?.classList.add("is-driving");
+    }
+
+    function exitVehicle() {
+        sceneState.vehicleController.exit(sceneState.playerController.mesh);
+        sceneState.playerController.setActive(true);
+        sceneState.camera.lockedTarget = sceneState.playerController.mesh;
+        applyCameraMode(sceneState.camera, "pedestrian");
+        gameShell?.classList.remove("is-driving");
+    }
+
+    function useVehicleAction() {
+        if (sceneState.vehicleController.active) {
+            exitVehicle();
+            return;
+        }
+
+        if (sceneState.vehicleController.canEnter(sceneState.playerController.mesh)) {
+            enterVehicle();
+        }
+    }
+
+    function updateMobileVehicleButton() {
+        if (!mobileVehicleButton) {
+            return;
+        }
+
+        const canUseVehicle = sceneState.vehicleController.active
+            || (
+                sceneState.playerController.active
+                && sceneState.vehicleController.canEnter(sceneState.playerController.mesh)
+            );
+
+        mobileVehicleButton.classList.toggle("is-visible", canUseVehicle);
+        mobileVehicleButton.textContent = sceneState.vehicleController.active ? "Exit" : "Enter";
+    }
+
     function onKeyDown(event) {
         if (event.code !== "KeyE" || event.repeat) {
             return;
         }
 
-        if (sceneState.vehicleController.active) {
-            sceneState.vehicleController.exit(sceneState.playerController.mesh);
-            sceneState.playerController.setActive(true);
-            sceneState.camera.lockedTarget = sceneState.playerController.mesh;
-            applyCameraMode(sceneState.camera, "pedestrian");
-            return;
-        }
+        useVehicleAction();
+    }
 
-        if (sceneState.vehicleController.canEnter(sceneState.playerController.mesh)) {
-            sceneState.playerController.setActive(false);
-            sceneState.vehicleController.enter();
-            sceneState.camera.lockedTarget = sceneState.vehicleController.mesh;
-            applyCameraMode(sceneState.camera, "vehicle");
-        }
+    function onMobileVehicleAction(event) {
+        useVehicleAction();
+        event.preventDefault();
     }
 
     window.addEventListener("keydown", onKeyDown);
+    mobileVehicleButton?.addEventListener("pointerdown", onMobileVehicleAction);
+
+    const observer = sceneState.scene.onBeforeRenderObservable.add(updateMobileVehicleButton);
 
     return () => {
         window.removeEventListener("keydown", onKeyDown);
+        mobileVehicleButton?.removeEventListener("pointerdown", onMobileVehicleAction);
+        sceneState.scene.onBeforeRenderObservable.remove(observer);
     };
 }
 
