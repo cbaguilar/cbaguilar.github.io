@@ -15,6 +15,7 @@ export function createCombatSystem({ scene, playerController, vehicleController,
         updateCombat({
             scene,
             playerController,
+            vehicleController,
             itemSystem,
             npcSystem,
             audioSystem,
@@ -33,7 +34,7 @@ export function createCombatSystem({ scene, playerController, vehicleController,
     };
 }
 
-function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSystem, input, state, onPromptChange, deltaSeconds }) {
+function updateCombat({ scene, playerController, vehicleController, itemSystem, npcSystem, audioSystem, input, state, onPromptChange, deltaSeconds }) {
     state.cooldown = Math.max(0, state.cooldown - deltaSeconds);
     state.messageTime = Math.max(0, state.messageTime - deltaSeconds);
 

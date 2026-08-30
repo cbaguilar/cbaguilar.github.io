@@ -86,6 +86,7 @@ export function createPc487App({ canvas }) {
         canvas,
         engine,
         scene,
+        testControls: createTestControls(sceneState),
         start,
         toggleDebugLayer,
         dispose,
@@ -268,6 +269,28 @@ function createVehicleAudioController(sceneState) {
         dispose() {
             sceneState.scene.onBeforeRenderObservable.remove(observer);
             sceneState.audioSystem.updateTruckEngine({ active: false, speed: 0 });
+        },
+    };
+}
+
+function createTestControls(sceneState) {
+    return {
+        grantPistol() {
+            if (!sceneState.itemSystem.hasItem("pistol")) {
+                sceneState.itemSystem.inventory.push({ id: "pistol", label: "Pistol" });
+                sceneState.playerController.equipItem("pistol");
+                updateInventoryHud(sceneState.itemSystem.inventory);
+            }
+        },
+        enterVehicle() {
+            sceneState.playerController.setActive(false);
+            sceneState.vehicleController.enter();
+            sceneState.camera.lockedTarget = sceneState.vehicleController.mesh;
+            applyCameraMode(sceneState.camera, "vehicle");
+            document.querySelector("#game-shell")?.classList.add("is-driving");
+        },
+        fire() {
+            window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
         },
     };
 }

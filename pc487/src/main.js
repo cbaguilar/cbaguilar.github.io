@@ -6,6 +6,10 @@ const debugToggle = document.getElementById("debug-toggle");
 const app = createPc487App({ canvas });
 app.start();
 
+if (new URLSearchParams(window.location.search).has("smoke")) {
+    window.__pc487 = app;
+}
+
 debugToggle.addEventListener("click", async () => {
     const isVisible = await app.toggleDebugLayer();
     debugToggle.setAttribute("aria-pressed", String(isVisible));
