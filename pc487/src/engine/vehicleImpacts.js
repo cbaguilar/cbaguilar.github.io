@@ -38,6 +38,10 @@ function updateVehicleImpacts({ vehicleController, npcSystem, audioSystem, hitTi
     }
 
     for (const npc of npcSystem.npcs) {
+        if (npc.ridden) {
+            continue;
+        }
+
         const cooldown = hitTimers.get(npc) ?? 0;
 
         if (cooldown > 0) {

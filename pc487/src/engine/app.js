@@ -311,8 +311,28 @@ function createInteractionController(sceneState) {
         gameShell?.classList.add("is-driving");
     }
 
+    function enterMount(mount) {
+        if (!sceneState.npcSystem.enterMount(mount)) {
+            return;
+        }
+
+        sceneState.playerController.setActive(false);
+        sceneState.camera.lockedTarget = mount.proxy;
+        applyCameraMode(sceneState.camera, "vehicle");
+        gameShell?.classList.add("is-driving");
+        updateInteractionPrompt(`Riding ${mount.mountLabel}`);
+    }
+
     function exitVehicle() {
         sceneState.vehicleController.exit(sceneState.playerController.mesh);
+        sceneState.playerController.setActive(true);
+        sceneState.camera.lockedTarget = sceneState.playerController.mesh;
+        applyCameraMode(sceneState.camera, "pedestrian");
+        gameShell?.classList.remove("is-driving");
+    }
+
+    function exitMount() {
+        sceneState.npcSystem.exitMount(sceneState.playerController.mesh);
         sceneState.playerController.setActive(true);
         sceneState.camera.lockedTarget = sceneState.playerController.mesh;
         applyCameraMode(sceneState.camera, "pedestrian");
@@ -325,8 +345,20 @@ function createInteractionController(sceneState) {
             return;
         }
 
+        if (sceneState.npcSystem.activeMount) {
+            exitMount();
+            return;
+        }
+
         if (sceneState.vehicleController.canEnter(sceneState.playerController.mesh)) {
             enterVehicle();
+            return;
+        }
+
+        const availableMount = sceneState.npcSystem.findAvailableMount(sceneState.playerController.mesh);
+
+        if (availableMount) {
+            enterMount(availableMount);
         }
     }
 
@@ -335,14 +367,23 @@ function createInteractionController(sceneState) {
             return;
         }
 
+        const availableMount = sceneState.playerController.active
+            ? sceneState.npcSystem.findAvailableMount(sceneState.playerController.mesh)
+            : null;
         const canUseVehicle = sceneState.vehicleController.active
+            || sceneState.npcSystem.activeMount
             || (
                 sceneState.playerController.active
                 && sceneState.vehicleController.canEnter(sceneState.playerController.mesh)
-            );
+            )
+            || Boolean(availableMount);
 
         mobileVehicleButton.classList.toggle("is-visible", canUseVehicle);
-        mobileVehicleButton.textContent = sceneState.vehicleController.active ? "Exit" : "Enter";
+        mobileVehicleButton.textContent = sceneState.vehicleController.active || sceneState.npcSystem.activeMount
+            ? "Exit"
+            : availableMount
+                ? "Ride"
+                : "Enter";
     }
 
     function onKeyDown(event) {

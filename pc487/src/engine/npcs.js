@@ -5,8 +5,11 @@ const NPC_COLLISION_RADIUS = 0.48;
 const WALK_CYCLE_SPEED = 5.5;
 const KNOCKBACK_DRAG = 4.2;
 const DEFEATED_DRAG = 1.8;
+const MOUNT_ENTER_DISTANCE = 4.8;
 
 export function createNpcSystem({ scene, collisionWorld }) {
+    const rideInput = createRideInputState();
+    let activeMount = null;
     const npcs = [
         createNpc(scene, {
             name: "npcWarehouseWorker",
@@ -42,6 +45,8 @@ export function createNpcSystem({ scene, collisionWorld }) {
             collisionRadius: 1.35,
             healthBarY: 3.15,
             targetYOffset: 1.85,
+            mountable: true,
+            mountLabel: "Horse",
             modelFactory: createMountedOfficer,
         }),
     ];
@@ -50,12 +55,50 @@ export function createNpcSystem({ scene, collisionWorld }) {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
 
         for (const npc of npcs) {
-            updateNpc(npc, collisionWorld, deltaSeconds);
+            updateNpc(npc, collisionWorld, rideInput, deltaSeconds);
         }
     });
 
     return {
         npcs,
+        get activeMount() {
+            return activeMount;
+        },
+        findAvailableMount(playerMesh) {
+            return findAvailableMount(npcs, playerMesh);
+        },
+        enterMount(npc) {
+            if (!npc?.mountable || !npc.defeated || npc.ridden) {
+                return false;
+            }
+
+            activeMount = npc;
+            npc.ridden = true;
+            npc.velocity.copyFromFloats(0, 0, 0);
+            npc.ride.speed = 0;
+            npc.ride.steeringAngle = 0;
+            npc.model.playerRiderRoot?.setEnabled(true);
+            return true;
+        },
+        exitMount(playerMesh) {
+            if (!activeMount) {
+                return;
+            }
+
+            const mount = activeMount;
+            mount.ridden = false;
+            mount.ride.speed = 0;
+            mount.ride.steeringAngle = 0;
+            mount.model.playerRiderRoot?.setEnabled(false);
+            const exitOffset = getForward(mount.proxy).scale(-2.2).add(getRight(mount.proxy).scale(1.8));
+            playerMesh.position.set(
+                clamp(mount.proxy.position.x + exitOffset.x, -86, 86),
+                1,
+                clamp(mount.proxy.position.z + exitOffset.z, -86, 86),
+            );
+            playerMesh.rotation.y = mount.proxy.rotation.y;
+            activeMount = null;
+        },
         findTarget({ origin, direction, range, minDot }) {
             return findNpcTarget({ npcs, origin, direction, range, minDot });
         },
@@ -67,6 +110,7 @@ export function createNpcSystem({ scene, collisionWorld }) {
         },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
+            rideInput.dispose();
 
             for (const npc of npcs) {
                 npc.proxy.dispose(false, true);
@@ -102,6 +146,14 @@ function createNpc(scene, spec) {
         defeated: false,
         collisionRadius: spec.collisionRadius ?? NPC_COLLISION_RADIUS,
         targetYOffset: spec.targetYOffset ?? 0.85,
+        mountable: Boolean(spec.mountable),
+        mountLabel: spec.mountLabel ?? "Mount",
+        ridden: false,
+        ride: {
+            speed: 0,
+            steeringAngle: 0,
+            walkTime: 0,
+        },
         velocity: new BABYLON.Vector3(),
         wanderRadius: spec.wanderRadius,
         wanderSpeed: spec.wanderSpeed,
@@ -230,6 +282,9 @@ function createMountedOfficer(scene, parent, spec) {
     addBodyBox(scene, riderRoot, `${spec.name}LeftRein`, { width: 0.04, height: 0.04, depth: 1.26 }, [-0.16, 0.76, 0.72], tack).rotation.x = BABYLON.Tools.ToRadians(18);
     addBodyBox(scene, riderRoot, `${spec.name}RightRein`, { width: 0.04, height: 0.04, depth: 1.26 }, [0.16, 0.76, 0.72], tack).rotation.x = BABYLON.Tools.ToRadians(18);
 
+    const playerRiderRoot = createMountedPlayerRider(scene, root, spec);
+    playerRiderRoot.setEnabled(false);
+
     return {
         root,
         torso,
@@ -238,7 +293,34 @@ function createMountedOfficer(scene, parent, spec) {
         leftLeg,
         rightLeg,
         horseRoot,
+        riderRoot,
+        playerRiderRoot,
     };
+}
+
+function createMountedPlayerRider(scene, parent, spec) {
+    const skin = makeMaterial(scene, `${spec.name}PlayerRiderSkin`, 0.78, 0.58, 0.42);
+    const shirt = makeMaterial(scene, `${spec.name}PlayerRiderShirt`, 0.13, 0.3, 0.72);
+    const pants = makeMaterial(scene, `${spec.name}PlayerRiderPants`, 0.12, 0.13, 0.16);
+    const shoes = makeMaterial(scene, `${spec.name}PlayerRiderShoes`, 0.035, 0.035, 0.04);
+    const hair = makeMaterial(scene, `${spec.name}PlayerRiderHair`, 0.08, 0.045, 0.025);
+
+    const riderRoot = new BABYLON.TransformNode(`${spec.name}PlayerRider`, scene);
+    riderRoot.parent = parent;
+    riderRoot.position.set(0, 1.22, -0.06);
+
+    addBodyBox(scene, riderRoot, `${spec.name}PlayerRiderTorso`, { width: 0.68, height: 0.78, depth: 0.36 }, [0, 0.75, 0], shirt);
+    addBodyBox(scene, riderRoot, `${spec.name}PlayerRiderHead`, { width: 0.46, height: 0.46, depth: 0.4 }, [0, 1.48, 0], skin);
+    addBodyBox(scene, riderRoot, `${spec.name}PlayerRiderHair`, { width: 0.5, height: 0.12, depth: 0.42 }, [0, 1.75, -0.02], hair);
+    createArm(scene, riderRoot, `${spec.name}PlayerRiderLeftArm`, [-0.49, 0.78, 0.06], shirt, skin);
+    createArm(scene, riderRoot, `${spec.name}PlayerRiderRightArm`, [0.49, 0.78, 0.06], shirt, skin);
+
+    const leftLeg = createLeg(scene, riderRoot, `${spec.name}PlayerRiderLeftLeg`, [-0.24, 0.32, 0.12], pants, shoes);
+    const rightLeg = createLeg(scene, riderRoot, `${spec.name}PlayerRiderRightLeg`, [0.24, 0.32, 0.12], pants, shoes);
+    leftLeg.rotation.x = BABYLON.Tools.ToRadians(42);
+    rightLeg.rotation.x = BABYLON.Tools.ToRadians(42);
+
+    return riderRoot;
 }
 
 function createArm(scene, parent, name, position, sleeveMaterial, handMaterial) {
@@ -263,10 +345,22 @@ function createLeg(scene, parent, name, position, pantsMaterial, shoeMaterial) {
     return legRoot;
 }
 
-function updateNpc(npc, collisionWorld, deltaSeconds) {
+function updateNpc(npc, collisionWorld, rideInput, deltaSeconds) {
+    if (npc.ridden) {
+        updateMountedHorse(npc, collisionWorld, rideInput, deltaSeconds);
+        return;
+    }
+
     if (npc.defeated) {
         integrateNpcVelocity(npc, collisionWorld, deltaSeconds, DEFEATED_DRAG);
-        npc.model.root.rotation.z = approach(npc.model.root.rotation.z, BABYLON.Tools.ToRadians(82), deltaSeconds * 4);
+        if (npc.mountable) {
+            npc.model.riderRoot?.setEnabled(false);
+            npc.model.playerRiderRoot?.setEnabled(false);
+            npc.model.root.rotation.z = approach(npc.model.root.rotation.z, 0, deltaSeconds * 5);
+            npc.proxy.position.y = NPC_HALF_HEIGHT;
+        } else {
+            npc.model.root.rotation.z = approach(npc.model.root.rotation.z, BABYLON.Tools.ToRadians(82), deltaSeconds * 4);
+        }
         npc.healthBar.root.setEnabled(false);
         return;
     }
@@ -334,6 +428,190 @@ function integrateNpcVelocity(npc, collisionWorld, deltaSeconds, drag) {
     npc.origin.z += (npc.proxy.position.z - npc.origin.z) * 0.04;
 }
 
+function updateMountedHorse(npc, collisionWorld, rideInput, deltaSeconds) {
+    const acceleration = 11;
+    const rollingDrag = 3.2;
+    const brakeDrag = 12;
+    const maxForward = 16;
+    const maxReverse = -4.5;
+    const maxSteeringAngle = BABYLON.Tools.ToRadians(42);
+    const turnWheelBase = 3.2;
+
+    const throttle = rideInput.throttle;
+    const steering = rideInput.steering;
+    npc.ride.steeringAngle = approach(npc.ride.steeringAngle, steering * maxSteeringAngle, BABYLON.Tools.ToRadians(130) * deltaSeconds);
+    npc.ride.speed += throttle * acceleration * deltaSeconds;
+
+    if (throttle === 0) {
+        npc.ride.speed = approach(npc.ride.speed, 0, rollingDrag * deltaSeconds);
+    }
+
+    if (Math.sign(throttle) !== Math.sign(npc.ride.speed) && throttle !== 0) {
+        npc.ride.speed = approach(npc.ride.speed, 0, brakeDrag * deltaSeconds);
+    }
+
+    npc.ride.speed = clamp(npc.ride.speed, maxReverse, maxForward);
+
+    if (Math.abs(npc.ride.speed) > 0.02 && Math.abs(npc.ride.steeringAngle) > 0.001) {
+        const yawRate = (npc.ride.speed / turnWheelBase) * Math.tan(npc.ride.steeringAngle);
+        npc.proxy.rotation.y += yawRate * deltaSeconds;
+    }
+
+    const forward = getForward(npc.proxy);
+    const previousPosition = npc.proxy.position.clone();
+    npc.proxy.position.x = clamp(npc.proxy.position.x + forward.x * npc.ride.speed * deltaSeconds, -86, 86);
+    npc.proxy.position.z = clamp(npc.proxy.position.z + forward.z * npc.ride.speed * deltaSeconds, -86, 86);
+    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, npc.collisionRadius);
+    const collided = resolvedPosition.x !== npc.proxy.position.x || resolvedPosition.z !== npc.proxy.position.z;
+    npc.proxy.position.x = resolvedPosition.x;
+    npc.proxy.position.z = resolvedPosition.z;
+    npc.proxy.position.y = NPC_HALF_HEIGHT;
+
+    if (collided) {
+        npc.ride.speed *= -0.18;
+    }
+
+    npc.origin.x = npc.proxy.position.x;
+    npc.origin.z = npc.proxy.position.z;
+    npc.ride.walkTime += Math.abs(npc.ride.speed) * deltaSeconds * 3.8;
+    animateHorseRide(npc.model, npc.ride.walkTime, Math.min(Math.abs(npc.ride.speed) / maxForward, 1), npc.ride.steeringAngle);
+}
+
+function animateHorseRide(model, walkTime, moveAmount, steeringAngle) {
+    if (!model.horseRoot) {
+        return;
+    }
+
+    model.root.rotation.z = 0;
+    model.horseRoot.rotation.y = steeringAngle * 0.12;
+    model.horseRoot.position.y = Math.abs(Math.sin(walkTime)) * 0.045 * moveAmount;
+
+    if (model.playerRiderRoot) {
+        model.playerRiderRoot.rotation.z = -steeringAngle * 0.18;
+        model.playerRiderRoot.position.y = 1.22 + Math.abs(Math.sin(walkTime)) * 0.035 * moveAmount;
+    }
+}
+
+function findAvailableMount(npcs, playerMesh) {
+    let nearestMount = null;
+
+    for (const npc of npcs) {
+        if (!npc.mountable || !npc.defeated || npc.ridden) {
+            continue;
+        }
+
+        const distance = BABYLON.Vector3.Distance(playerMesh.position, npc.proxy.position);
+
+        if (distance > MOUNT_ENTER_DISTANCE) {
+            continue;
+        }
+
+        if (!nearestMount || distance < nearestMount.distance) {
+            nearestMount = { npc, distance };
+        }
+    }
+
+    return nearestMount?.npc ?? null;
+}
+
+function createRideInputState() {
+    const pressed = new Set();
+    const joystick = {
+        active: false,
+        pointerId: null,
+        centerX: 0,
+        centerY: 0,
+        throttle: 0,
+        steering: 0,
+    };
+    const joystickBase = document.querySelector("#move-joystick");
+    const joystickRadius = 52;
+
+    function onKeyDown(event) {
+        pressed.add(event.code);
+    }
+
+    function onKeyUp(event) {
+        pressed.delete(event.code);
+    }
+
+    function updateJoystick(event) {
+        const rawX = event.clientX - joystick.centerX;
+        const rawY = event.clientY - joystick.centerY;
+        const distance = Math.hypot(rawX, rawY);
+        const scale = distance > joystickRadius ? joystickRadius / distance : 1;
+
+        joystick.steering = clamp((rawX * scale) / joystickRadius, -1, 1);
+        joystick.throttle = clamp((-rawY * scale) / joystickRadius, -1, 1);
+    }
+
+    function resetJoystick() {
+        joystick.active = false;
+        joystick.pointerId = null;
+        joystick.throttle = 0;
+        joystick.steering = 0;
+    }
+
+    function onJoystickDown(event) {
+        const bounds = joystickBase.getBoundingClientRect();
+        joystick.active = true;
+        joystick.pointerId = event.pointerId;
+        joystick.centerX = bounds.left + bounds.width / 2;
+        joystick.centerY = bounds.top + bounds.height / 2;
+        updateJoystick(event);
+    }
+
+    function onJoystickMove(event) {
+        if (!joystick.active || event.pointerId !== joystick.pointerId) {
+            return;
+        }
+
+        updateJoystick(event);
+    }
+
+    function onJoystickEnd(event) {
+        if (event.pointerId !== joystick.pointerId) {
+            return;
+        }
+
+        resetJoystick();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
+    if (joystickBase) {
+        joystickBase.addEventListener("pointerdown", onJoystickDown);
+        joystickBase.addEventListener("pointermove", onJoystickMove);
+        joystickBase.addEventListener("pointerup", onJoystickEnd);
+        joystickBase.addEventListener("pointercancel", onJoystickEnd);
+        joystickBase.addEventListener("lostpointercapture", resetJoystick);
+    }
+
+    return {
+        get throttle() {
+            const keyboardThrottle = Number(pressed.has("KeyW")) - Number(pressed.has("KeyS"));
+            return clamp(keyboardThrottle + joystick.throttle, -1, 1);
+        },
+        get steering() {
+            const keyboardSteering = Number(pressed.has("KeyD")) - Number(pressed.has("KeyA"));
+            return clamp(keyboardSteering + joystick.steering, -1, 1);
+        },
+        dispose() {
+            window.removeEventListener("keydown", onKeyDown);
+            window.removeEventListener("keyup", onKeyUp);
+
+            if (joystickBase) {
+                joystickBase.removeEventListener("pointerdown", onJoystickDown);
+                joystickBase.removeEventListener("pointermove", onJoystickMove);
+                joystickBase.removeEventListener("pointerup", onJoystickEnd);
+                joystickBase.removeEventListener("pointercancel", onJoystickEnd);
+                joystickBase.removeEventListener("lostpointercapture", resetJoystick);
+            }
+        },
+    };
+}
+
 function findNpcTarget({ npcs, origin, direction, range, minDot }) {
     let bestHit = null;
 
@@ -399,6 +677,14 @@ function applyImpulseToNpc(npc, impulse) {
     if (impulse.lengthSquared() > 0.0001) {
         npc.proxy.rotation.y = Math.atan2(impulse.x, impulse.z);
     }
+}
+
+function getForward(mesh) {
+    return new BABYLON.Vector3(Math.sin(mesh.rotation.y), 0, Math.cos(mesh.rotation.y));
+}
+
+function getRight(mesh) {
+    return new BABYLON.Vector3(Math.cos(mesh.rotation.y), 0, -Math.sin(mesh.rotation.y));
 }
 
 function updateHealthBar(npc) {
