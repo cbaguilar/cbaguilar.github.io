@@ -32,6 +32,18 @@ export function createNpcSystem({ scene, collisionWorld }) {
             wanderRadius: 5.2,
             wanderSpeed: 1.45,
         }),
+        createNpc(scene, {
+            name: "npcMountedOfficer",
+            position: [18, NPC_HALF_HEIGHT, 16],
+            rotation: -145,
+            shirt: [0.07, 0.16, 0.32],
+            wanderRadius: 6.4,
+            wanderSpeed: 0.92,
+            collisionRadius: 1.35,
+            healthBarY: 3.15,
+            targetYOffset: 1.85,
+            modelFactory: createMountedOfficer,
+        }),
     ];
 
     const observer = scene.onBeforeRenderObservable.add(() => {
@@ -77,8 +89,8 @@ function createNpc(scene, spec) {
     proxy.position.set(spec.position[0], spec.position[1], spec.position[2]);
     proxy.rotation.y = BABYLON.Tools.ToRadians(spec.rotation);
 
-    const model = createBlockHumanoid(scene, proxy, spec);
-    const healthBar = createHealthBar(scene, proxy, spec.name);
+    const model = (spec.modelFactory ?? createBlockHumanoid)(scene, proxy, spec);
+    const healthBar = createHealthBar(scene, proxy, spec.name, spec.healthBarY ?? 1.75);
 
     return {
         proxy,
@@ -88,6 +100,8 @@ function createNpc(scene, spec) {
         health: NPC_MAX_HEALTH,
         maxHealth: NPC_MAX_HEALTH,
         defeated: false,
+        collisionRadius: spec.collisionRadius ?? NPC_COLLISION_RADIUS,
+        targetYOffset: spec.targetYOffset ?? 0.85,
         velocity: new BABYLON.Vector3(),
         wanderRadius: spec.wanderRadius,
         wanderSpeed: spec.wanderSpeed,
@@ -96,10 +110,10 @@ function createNpc(scene, spec) {
     };
 }
 
-function createHealthBar(scene, parent, name) {
+function createHealthBar(scene, parent, name, height) {
     const root = new BABYLON.TransformNode(`${name}HealthBar`, scene);
     root.parent = parent;
-    root.position.set(0, 1.75, 0);
+    root.position.set(0, height, 0);
 
     const backMaterial = makeMaterial(scene, `${name}HealthBack`, 0.08, 0.08, 0.08);
     const fillMaterial = makeMaterial(scene, `${name}HealthFill`, 0.2, 0.85, 0.18);
@@ -143,6 +157,87 @@ function createBlockHumanoid(scene, parent, spec) {
         rightArm,
         leftLeg,
         rightLeg,
+    };
+}
+
+function createMountedOfficer(scene, parent, spec) {
+    const horseBody = makeMaterial(scene, `${spec.name}HorseBody`, 0.28, 0.16, 0.08);
+    const horseMane = makeMaterial(scene, `${spec.name}HorseMane`, 0.045, 0.03, 0.02);
+    const tack = makeMaterial(scene, `${spec.name}Tack`, 0.04, 0.035, 0.03);
+    const metal = makeMaterial(scene, `${spec.name}Metal`, 0.72, 0.68, 0.52);
+    const skin = makeMaterial(scene, `${spec.name}Skin`, 0.76, 0.56, 0.4);
+    const shirt = makeMaterial(scene, `${spec.name}Shirt`, spec.shirt[0], spec.shirt[1], spec.shirt[2]);
+    const pants = makeMaterial(scene, `${spec.name}Pants`, 0.08, 0.09, 0.12);
+    const hat = makeMaterial(scene, `${spec.name}Hat`, 0.58, 0.39, 0.18);
+    const black = makeMaterial(scene, `${spec.name}Black`, 0.025, 0.022, 0.018);
+
+    const root = new BABYLON.TransformNode(`${spec.name}MountedRoot`, scene);
+    root.parent = parent;
+    root.position.y = -NPC_HALF_HEIGHT;
+
+    const horseRoot = new BABYLON.TransformNode(`${spec.name}Horse`, scene);
+    horseRoot.parent = root;
+
+    addBodyBox(scene, horseRoot, `${spec.name}HorseTorso`, { width: 0.95, height: 0.82, depth: 2.15 }, [0, 0.92, 0], horseBody);
+    addBodyBox(scene, horseRoot, `${spec.name}HorseChest`, { width: 0.86, height: 0.95, depth: 0.55 }, [0, 1.02, 0.98], horseBody);
+
+    const neck = addBodyBox(scene, horseRoot, `${spec.name}HorseNeck`, { width: 0.46, height: 0.95, depth: 0.36 }, [0, 1.55, 1.12], horseBody);
+    neck.rotation.x = BABYLON.Tools.ToRadians(-24);
+    const head = addBodyBox(scene, horseRoot, `${spec.name}HorseHead`, { width: 0.52, height: 0.48, depth: 0.68 }, [0, 1.95, 1.55], horseBody);
+    head.rotation.x = BABYLON.Tools.ToRadians(-8);
+    addBodyBox(scene, horseRoot, `${spec.name}HorseMuzzle`, { width: 0.44, height: 0.28, depth: 0.34 }, [0, 1.82, 1.98], horseMane);
+    addBodyBox(scene, horseRoot, `${spec.name}HorseMane`, { width: 0.12, height: 0.9, depth: 0.2 }, [0, 1.57, 0.88], horseMane);
+    addBodyBox(scene, horseRoot, `${spec.name}HorseTail`, { width: 0.22, height: 0.22, depth: 0.86 }, [0, 1.06, -1.36], horseMane).rotation.x = BABYLON.Tools.ToRadians(-18);
+
+    for (const [index, x] of [-0.38, 0.38].entries()) {
+        for (const z of [-0.68, 0.72]) {
+            const leg = addBodyBox(scene, horseRoot, `${spec.name}HorseLeg${index}${z}`, { width: 0.22, height: 0.88, depth: 0.24 }, [x, 0.3, z], horseBody);
+            leg.rotation.x = BABYLON.Tools.ToRadians(z > 0 ? -4 : 5);
+            addBodyBox(scene, horseRoot, `${spec.name}HorseHoof${index}${z}`, { width: 0.3, height: 0.14, depth: 0.34 }, [x, -0.2, z + 0.03], black);
+        }
+    }
+
+    addBodyBox(scene, horseRoot, `${spec.name}Saddle`, { width: 1.02, height: 0.18, depth: 0.82 }, [0, 1.38, -0.02], tack);
+    addBodyBox(scene, horseRoot, `${spec.name}SaddleBlanket`, { width: 1.08, height: 0.08, depth: 1.05 }, [0, 1.28, -0.02], shirt);
+
+    const riderRoot = new BABYLON.TransformNode(`${spec.name}Officer`, scene);
+    riderRoot.parent = root;
+    riderRoot.position.set(0, 1.22, -0.06);
+
+    const torso = addBodyBox(scene, riderRoot, `${spec.name}OfficerTorso`, { width: 0.68, height: 0.78, depth: 0.36 }, [0, 0.75, 0], shirt);
+    addBodyBox(scene, riderRoot, `${spec.name}OfficerNeck`, { width: 0.22, height: 0.12, depth: 0.18 }, [0, 1.2, 0], skin);
+    addBodyBox(scene, riderRoot, `${spec.name}OfficerHead`, { width: 0.46, height: 0.46, depth: 0.4 }, [0, 1.48, 0], skin);
+    addBodyBox(scene, riderRoot, `${spec.name}Badge`, { width: 0.12, height: 0.12, depth: 0.03 }, [0.2, 0.84, 0.2], metal);
+
+    const hatBrim = BABYLON.MeshBuilder.CreateCylinder(`${spec.name}CowboyHatBrim`, { diameter: 0.72, height: 0.06, tessellation: 20 }, scene);
+    hatBrim.parent = riderRoot;
+    hatBrim.position.set(0, 1.75, 0);
+    hatBrim.scaling.z = 0.72;
+    hatBrim.material = hat;
+
+    const hatCrown = BABYLON.MeshBuilder.CreateCylinder(`${spec.name}CowboyHatCrown`, { diameterTop: 0.34, diameterBottom: 0.42, height: 0.28, tessellation: 16 }, scene);
+    hatCrown.parent = riderRoot;
+    hatCrown.position.set(0, 1.91, 0);
+    hatCrown.material = hat;
+
+    const leftArm = createArm(scene, riderRoot, `${spec.name}OfficerLeftArm`, [-0.49, 0.78, 0.06], shirt, skin);
+    const rightArm = createArm(scene, riderRoot, `${spec.name}OfficerRightArm`, [0.49, 0.78, 0.06], shirt, skin);
+    const leftLeg = createLeg(scene, riderRoot, `${spec.name}OfficerLeftLeg`, [-0.24, 0.32, 0.12], pants, black);
+    const rightLeg = createLeg(scene, riderRoot, `${spec.name}OfficerRightLeg`, [0.24, 0.32, 0.12], pants, black);
+    leftLeg.rotation.x = BABYLON.Tools.ToRadians(42);
+    rightLeg.rotation.x = BABYLON.Tools.ToRadians(42);
+
+    addBodyBox(scene, riderRoot, `${spec.name}LeftRein`, { width: 0.04, height: 0.04, depth: 1.26 }, [-0.16, 0.76, 0.72], tack).rotation.x = BABYLON.Tools.ToRadians(18);
+    addBodyBox(scene, riderRoot, `${spec.name}RightRein`, { width: 0.04, height: 0.04, depth: 1.26 }, [0.16, 0.76, 0.72], tack).rotation.x = BABYLON.Tools.ToRadians(18);
+
+    return {
+        root,
+        torso,
+        leftArm,
+        rightArm,
+        leftLeg,
+        rightLeg,
+        horseRoot,
     };
 }
 
@@ -195,7 +290,7 @@ function updateNpc(npc, collisionWorld, deltaSeconds) {
     const previousPosition = npc.proxy.position.clone();
     npc.proxy.position.x = nextX;
     npc.proxy.position.z = nextZ;
-    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, NPC_COLLISION_RADIUS);
+    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, npc.collisionRadius);
     const collided = resolvedPosition.x !== npc.proxy.position.x || resolvedPosition.z !== npc.proxy.position.z;
     npc.proxy.position.x = resolvedPosition.x;
     npc.proxy.position.z = resolvedPosition.z;
@@ -219,7 +314,7 @@ function integrateNpcVelocity(npc, collisionWorld, deltaSeconds, drag) {
     npc.proxy.position.x += npc.velocity.x * deltaSeconds;
     npc.proxy.position.z += npc.velocity.z * deltaSeconds;
 
-    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, NPC_COLLISION_RADIUS);
+    const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, npc.collisionRadius);
     const collided = resolvedPosition.x !== npc.proxy.position.x || resolvedPosition.z !== npc.proxy.position.z;
     npc.proxy.position.x = resolvedPosition.x;
     npc.proxy.position.z = resolvedPosition.z;
@@ -247,7 +342,7 @@ function findNpcTarget({ npcs, origin, direction, range, minDot }) {
             continue;
         }
 
-        const target = npc.proxy.position.add(new BABYLON.Vector3(0, 0.85, 0));
+        const target = npc.proxy.position.add(new BABYLON.Vector3(0, npc.targetYOffset, 0));
         const toTarget = target.subtract(origin);
         const distance = toTarget.length();
 
