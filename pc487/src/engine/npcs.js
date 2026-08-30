@@ -721,6 +721,10 @@ function approach(value, target, amount) {
     return Math.max(value - amount, target);
 }
 
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
 function addBodyBox(scene, parent, name, size, position, material) {
     const mesh = BABYLON.MeshBuilder.CreateBox(name, size, scene);
     mesh.parent = parent;

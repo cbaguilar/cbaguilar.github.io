@@ -3,7 +3,7 @@ const PISTOL_RANGE = 42;
 const PISTOL_COOLDOWN_SECONDS = 0.32;
 const AIM_CONE_DOT = 0.94;
 
-export function createCombatSystem({ scene, playerController, itemSystem, npcSystem, audioSystem, onPromptChange }) {
+export function createCombatSystem({ scene, playerController, vehicleController, itemSystem, npcSystem, audioSystem, onPromptChange }) {
     const input = createInputState(scene.getEngine().getRenderingCanvas());
     const state = {
         cooldown: 0,
@@ -43,11 +43,6 @@ function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSys
         return;
     }
 
-    if (!playerController.active) {
-        showCombatMessage(onPromptChange, state, "Exit the vehicle to shoot");
-        return;
-    }
-
     if (!itemSystem.hasItem("pistol")) {
         showCombatMessage(onPromptChange, state, "Pick up the pistol first");
         return;
@@ -58,19 +53,15 @@ function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSys
     }
 
     state.cooldown = PISTOL_COOLDOWN_SECONDS;
+    const aimPoint = shootRequest.pointer
+        ? getGroundAimPoint(scene, shootRequest.pointer.x, shootRequest.pointer.y)
+        : null;
+    const shooter = getActiveShooter({ playerController, vehicleController, npcSystem, aimPoint });
 
-    if (shootRequest.pointer) {
-        const aimPoint = getGroundAimPoint(scene, shootRequest.pointer.x, shootRequest.pointer.y);
-
-        if (aimPoint) {
-            playerController.facePoint(aimPoint);
-        }
-    }
-
-    playerController.playShootAnimation();
+    shooter.animate();
     audioSystem.playGunshot();
 
-    const shot = getShotVector(playerController);
+    const shot = shooter.getShotVector();
     const hit = npcSystem.findTarget({
         origin: shot.origin,
         direction: shot.direction,
@@ -99,6 +90,68 @@ function updateCombat({ scene, playerController, itemSystem, npcSystem, audioSys
     showCombatMessage(onPromptChange, state, result.defeated ? "NPC down" : `Hit NPC (${result.health} HP)`);
 }
 
+function getActiveShooter({ playerController, vehicleController, npcSystem, aimPoint }) {
+    if (playerController.active) {
+        if (aimPoint) {
+            playerController.facePoint(aimPoint);
+        }
+
+        return {
+            animate() {
+                playerController.playShootAnimation();
+            },
+            getShotVector() {
+                return getShotVectorFromMesh({
+                    mesh: playerController.mesh,
+                    origin: playerController.getMuzzlePosition(),
+                    aimPoint,
+                });
+            },
+        };
+    }
+
+    if (vehicleController?.active) {
+        return {
+            animate() {},
+            getShotVector() {
+                const mesh = vehicleController.mesh;
+                return getShotVectorFromMesh({
+                    mesh,
+                    origin: getVehicleMuzzlePosition(mesh),
+                    aimPoint,
+                });
+            },
+        };
+    }
+
+    if (npcSystem.activeMount) {
+        return {
+            animate() {
+                npcSystem.activeMount.ride.walkTime += 0.18;
+            },
+            getShotVector() {
+                const mesh = npcSystem.activeMount.proxy;
+                return getShotVectorFromMesh({
+                    mesh,
+                    origin: mesh.position.add(new BABYLON.Vector3(0, 2.35, 0)).add(getForward(mesh).scale(1.45)),
+                    aimPoint,
+                });
+            },
+        };
+    }
+
+    return {
+        animate() {},
+        getShotVector() {
+            return getShotVectorFromMesh({
+                mesh: playerController.mesh,
+                origin: playerController.getMuzzlePosition(),
+                aimPoint,
+            });
+        },
+    };
+}
+
 function getGroundAimPoint(scene, screenX, screenY) {
     const ray = scene.createPickingRay(screenX, screenY, BABYLON.Matrix.Identity(), scene.activeCamera);
 
@@ -115,15 +168,34 @@ function getGroundAimPoint(scene, screenX, screenY) {
     return ray.origin.add(ray.direction.scale(distance));
 }
 
-function getShotVector(playerController) {
-    const { mesh: playerMesh } = playerController;
-    const direction = new BABYLON.Vector3(Math.sin(playerMesh.rotation.y), 0, Math.cos(playerMesh.rotation.y));
+function getShotVectorFromMesh({ mesh, origin, aimPoint }) {
+    const direction = aimPoint
+        ? aimPoint.subtract(origin)
+        : getForward(mesh);
+    direction.y = 0;
+
+    if (direction.lengthSquared() < 0.0001) {
+        direction.copyFrom(getForward(mesh));
+    }
+
     direction.normalize();
 
     return {
-        origin: playerController.getMuzzlePosition(),
+        origin,
         direction,
     };
+}
+
+function getVehicleMuzzlePosition(mesh) {
+    return mesh.position
+        .add(new BABYLON.Vector3(0, 1.75, 0))
+        .add(getForward(mesh).scale(5.35));
+}
+
+function getForward(mesh) {
+    const direction = new BABYLON.Vector3(Math.sin(mesh.rotation.y), 0, Math.cos(mesh.rotation.y));
+    direction.normalize();
+    return direction;
 }
 
 function createTracer(scene, start, end, hit) {

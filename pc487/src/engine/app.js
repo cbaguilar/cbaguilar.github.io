@@ -163,6 +163,7 @@ function createScene(engine, canvas) {
     sceneState.combatSystem = createCombatSystem({
         scene,
         playerController: sceneState.playerController,
+        vehicleController: sceneState.vehicleController,
         itemSystem: sceneState.itemSystem,
         npcSystem: sceneState.npcSystem,
         audioSystem: sceneState.audioSystem,
