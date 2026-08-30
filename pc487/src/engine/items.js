@@ -58,6 +58,7 @@ function createGunPickup(scene, position) {
 function updatePickups({ playerController, audioSystem, pickups, input, inventory, onInventoryChange, onPromptChange }) {
     if (!playerController.active) {
         onPromptChange("");
+        input.setPickupAvailable(false);
         input.consumePickup();
         return;
     }
@@ -69,11 +70,13 @@ function updatePickups({ playerController, audioSystem, pickups, input, inventor
 
     if (!nearbyPickup) {
         onPromptChange("");
+        input.setPickupAvailable(false);
         input.consumePickup();
         return;
     }
 
-    onPromptChange(`Press F to pick up ${nearbyPickup.label}`);
+    input.setPickupAvailable(true);
+    onPromptChange(`Press F or tap Pick Up for ${nearbyPickup.label}`);
     animatePickup(nearbyPickup);
 
     if (!input.consumePickup()) {
@@ -86,6 +89,7 @@ function updatePickups({ playerController, audioSystem, pickups, input, inventor
     playerController.equipItem(nearbyPickup.id);
     audioSystem.playEquipGun();
     onInventoryChange([...inventory]);
+    input.setPickupAvailable(false);
     onPromptChange(`Picked up ${nearbyPickup.label}`);
 }
 
@@ -140,6 +144,7 @@ function createGunMesh(scene, name) {
 
 function createInputState() {
     let pickupRequested = false;
+    const mobilePickupButton = document.querySelector("#mobile-pickup");
 
     function onKeyDown(event) {
         if (event.code === "KeyF" && !event.repeat) {
@@ -147,9 +152,23 @@ function createInputState() {
         }
     }
 
+    function onMobilePickup(event) {
+        pickupRequested = true;
+        event.preventDefault();
+    }
+
     window.addEventListener("keydown", onKeyDown);
 
+    if (mobilePickupButton) {
+        mobilePickupButton.addEventListener("pointerdown", onMobilePickup);
+    }
+
     return {
+        setPickupAvailable(isAvailable) {
+            if (mobilePickupButton) {
+                mobilePickupButton.classList.toggle("is-visible", isAvailable);
+            }
+        },
         consumePickup() {
             const requested = pickupRequested;
             pickupRequested = false;
@@ -157,6 +176,10 @@ function createInputState() {
         },
         dispose() {
             window.removeEventListener("keydown", onKeyDown);
+
+            if (mobilePickupButton) {
+                mobilePickupButton.removeEventListener("pointerdown", onMobilePickup);
+            }
         },
     };
 }
