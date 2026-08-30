@@ -320,6 +320,7 @@ function createInteractionController(sceneState) {
         sceneState.camera.lockedTarget = mount.proxy;
         applyCameraMode(sceneState.camera, "vehicle");
         gameShell?.classList.add("is-driving");
+        updateMobileVehicleButton();
         updateInteractionPrompt(`Riding ${mount.mountLabel}`);
     }
 
@@ -329,6 +330,7 @@ function createInteractionController(sceneState) {
         sceneState.camera.lockedTarget = sceneState.playerController.mesh;
         applyCameraMode(sceneState.camera, "pedestrian");
         gameShell?.classList.remove("is-driving");
+        updateMobileVehicleButton();
     }
 
     function exitMount() {
@@ -395,6 +397,7 @@ function createInteractionController(sceneState) {
     }
 
     function onMobileVehicleAction(event) {
+        event.stopPropagation();
         useVehicleAction();
         event.preventDefault();
     }

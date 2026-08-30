@@ -77,6 +77,7 @@ export function createNpcSystem({ scene, collisionWorld }) {
             npc.velocity.copyFromFloats(0, 0, 0);
             npc.ride.speed = 0;
             npc.ride.steeringAngle = 0;
+            npc.model.riderRoot?.setEnabled(false);
             npc.model.playerRiderRoot?.setEnabled(true);
             return true;
         },
@@ -307,7 +308,8 @@ function createMountedPlayerRider(scene, parent, spec) {
 
     const riderRoot = new BABYLON.TransformNode(`${spec.name}PlayerRider`, scene);
     riderRoot.parent = parent;
-    riderRoot.position.set(0, 1.22, -0.06);
+    riderRoot.position.set(0, 1.36, 0);
+    riderRoot.scaling.setAll(0.92);
 
     addBodyBox(scene, riderRoot, `${spec.name}PlayerRiderTorso`, { width: 0.68, height: 0.78, depth: 0.36 }, [0, 0.75, 0], shirt);
     addBodyBox(scene, riderRoot, `${spec.name}PlayerRiderHead`, { width: 0.46, height: 0.46, depth: 0.4 }, [0, 1.48, 0], skin);
@@ -315,10 +317,12 @@ function createMountedPlayerRider(scene, parent, spec) {
     createArm(scene, riderRoot, `${spec.name}PlayerRiderLeftArm`, [-0.49, 0.78, 0.06], shirt, skin);
     createArm(scene, riderRoot, `${spec.name}PlayerRiderRightArm`, [0.49, 0.78, 0.06], shirt, skin);
 
-    const leftLeg = createLeg(scene, riderRoot, `${spec.name}PlayerRiderLeftLeg`, [-0.24, 0.32, 0.12], pants, shoes);
-    const rightLeg = createLeg(scene, riderRoot, `${spec.name}PlayerRiderRightLeg`, [0.24, 0.32, 0.12], pants, shoes);
-    leftLeg.rotation.x = BABYLON.Tools.ToRadians(42);
-    rightLeg.rotation.x = BABYLON.Tools.ToRadians(42);
+    const leftLeg = createLeg(scene, riderRoot, `${spec.name}PlayerRiderLeftLeg`, [-0.34, 0.28, 0.1], pants, shoes);
+    const rightLeg = createLeg(scene, riderRoot, `${spec.name}PlayerRiderRightLeg`, [0.34, 0.28, 0.1], pants, shoes);
+    leftLeg.rotation.x = BABYLON.Tools.ToRadians(50);
+    leftLeg.rotation.z = BABYLON.Tools.ToRadians(-12);
+    rightLeg.rotation.x = BABYLON.Tools.ToRadians(50);
+    rightLeg.rotation.z = BABYLON.Tools.ToRadians(12);
 
     return riderRoot;
 }
@@ -488,7 +492,7 @@ function animateHorseRide(model, walkTime, moveAmount, steeringAngle) {
 
     if (model.playerRiderRoot) {
         model.playerRiderRoot.rotation.z = -steeringAngle * 0.18;
-        model.playerRiderRoot.position.y = 1.22 + Math.abs(Math.sin(walkTime)) * 0.035 * moveAmount;
+        model.playerRiderRoot.position.y = 1.36 + Math.abs(Math.sin(walkTime)) * 0.035 * moveAmount;
     }
 }
 
