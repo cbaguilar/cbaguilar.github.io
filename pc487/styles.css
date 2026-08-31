@@ -197,6 +197,23 @@ h1 {
     touch-action: manipulation;
 }
 
+#mobile-teleport {
+    position: absolute;
+    left: 36px;
+    bottom: max(166px, calc(env(safe-area-inset-bottom) + 142px));
+    min-width: 104px;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 1px solid rgb(245 240 232 / 28%);
+    border-radius: 8px;
+    background: rgb(22 24 27 / 78%);
+    color: var(--fg);
+    font-weight: 800;
+    z-index: 3;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
 #mobile-pickup {
     position: absolute;
     right: 112px;
