@@ -6,6 +6,7 @@ import { createNpcSystem } from "./npcs.js";
 import { createPlayerController } from "./player.js";
 import { createVehicleController } from "./vehicle.js";
 import { createVehicleImpactSystem } from "./vehicleImpacts.js";
+import { resetMobileMoveInput } from "./mobileInput.js";
 
 const WORLD_SIZE = 180;
 const OVERWORLD_THRESHOLD_X = 58;
@@ -82,6 +83,7 @@ export function createPc487App({ canvas }) {
 
     function teleportToVehicle() {
         const playerMesh = sceneState.playerController.mesh;
+        resetMobileMoveInput();
 
         if (sceneState.npcSystem.activeMount) {
             sceneState.npcSystem.exitMount(playerMesh);
