@@ -14,6 +14,10 @@ This plan starts intentionally small: get a reliable web page rendering a 3D wor
 - Long-term art direction: fictionalized Inland Empire, inspired by regional geography and infrastructure rather than a literal map clone.
 - Performance target: desktop browser first, then mobile/tablet compatibility once the scene architecture stabilizes.
 
+Related design docs:
+
+- `pc487/docs/progression.md`: Zelda-like early progression from Santa Ana River forest through a drainage tunnel into the overworld.
+
 ## Repository Layout
 
 Initial static layout, preferred for the first rendering and movement spike:
