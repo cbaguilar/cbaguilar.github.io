@@ -160,6 +160,7 @@ function createBlockHumanoid(scene, parent) {
     const pants = makeMaterial(scene, "playerPants", 0.12, 0.13, 0.16);
     const shoes = makeMaterial(scene, "playerShoes", 0.035, 0.035, 0.04);
     const hair = makeMaterial(scene, "playerHair", 0.08, 0.045, 0.025);
+    const hat = makeMaterial(scene, "playerHat", 0.48, 0.28, 0.11);
 
     const fallbackModel = new BABYLON.TransformNode("playerBlockHumanoid", scene);
     fallbackModel.parent = parent;
@@ -169,6 +170,8 @@ function createBlockHumanoid(scene, parent) {
     addBodyBox(scene, fallbackModel, "playerNeck", { width: 0.28, height: 0.16, depth: 0.24 }, [0, 1.6, 0], skin);
     addBodyBox(scene, fallbackModel, "playerHead", { width: 0.56, height: 0.56, depth: 0.5 }, [0, 1.95, 0], skin);
     addBodyBox(scene, fallbackModel, "playerHair", { width: 0.6, height: 0.16, depth: 0.54 }, [0, 2.27, -0.02], hair);
+    addBodyBox(scene, fallbackModel, "playerHatBrim", { width: 0.82, height: 0.08, depth: 0.7 }, [0, 2.34, 0.03], hat);
+    addBodyBox(scene, fallbackModel, "playerHatCrown", { width: 0.52, height: 0.26, depth: 0.44 }, [0, 2.5, -0.02], hat);
 
     const leftArm = createLimb(scene, fallbackModel, "playerLeftArm", [-0.62, 1.16, 0], shirt, skin);
     const rightArm = createLimb(scene, fallbackModel, "playerRightArm", [0.62, 1.16, 0], shirt, skin);
