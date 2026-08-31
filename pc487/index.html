@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>PC487</title>
+    <title>Forest Maze Survival</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -17,7 +17,7 @@
         <section id="hud" aria-label="Game status">
             <div>
                 <p class="eyebrow">PC487</p>
-                <h1>Sandbox Prototype</h1>
+                <h1>Forest Maze Survival</h1>
                 <p id="interaction-prompt" class="hud-note" aria-live="polite"></p>
             </div>
             <div class="hud-actions">
@@ -25,6 +25,8 @@
                     <p class="eyebrow">Inventory</p>
                     <p id="inventory-slot">Empty</p>
                 </div>
+                <button id="debug-teleport" type="button">To Truck</button>
+                <button id="debug-noclip" type="button" aria-pressed="false">Noclip</button>
                 <button id="debug-toggle" type="button" aria-pressed="false">Debug</button>
             </div>
         </section>

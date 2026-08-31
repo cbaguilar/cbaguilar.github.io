@@ -1,3 +1,5 @@
+import { getMobileMoveInput } from "./mobileInput.js";
+
 const NPC_HEIGHT = 2;
 const NPC_HALF_HEIGHT = NPC_HEIGHT / 2;
 const NPC_MAX_HEALTH = 100;
@@ -534,16 +536,6 @@ function findAvailableMount(npcs, playerMesh) {
 
 function createRideInputState() {
     const pressed = new Set();
-    const joystick = {
-        active: false,
-        pointerId: null,
-        centerX: 0,
-        centerY: 0,
-        throttle: 0,
-        steering: 0,
-    };
-    const joystickBase = document.querySelector("#move-joystick");
-    const joystickRadius = 52;
 
     function onKeyDown(event) {
         pressed.add(event.code);
@@ -553,79 +545,21 @@ function createRideInputState() {
         pressed.delete(event.code);
     }
 
-    function updateJoystick(event) {
-        const rawX = event.clientX - joystick.centerX;
-        const rawY = event.clientY - joystick.centerY;
-        const distance = Math.hypot(rawX, rawY);
-        const scale = distance > joystickRadius ? joystickRadius / distance : 1;
-
-        joystick.steering = clamp((rawX * scale) / joystickRadius, -1, 1);
-        joystick.throttle = clamp((-rawY * scale) / joystickRadius, -1, 1);
-    }
-
-    function resetJoystick() {
-        joystick.active = false;
-        joystick.pointerId = null;
-        joystick.throttle = 0;
-        joystick.steering = 0;
-    }
-
-    function onJoystickDown(event) {
-        const bounds = joystickBase.getBoundingClientRect();
-        joystick.active = true;
-        joystick.pointerId = event.pointerId;
-        joystick.centerX = bounds.left + bounds.width / 2;
-        joystick.centerY = bounds.top + bounds.height / 2;
-        updateJoystick(event);
-    }
-
-    function onJoystickMove(event) {
-        if (!joystick.active || event.pointerId !== joystick.pointerId) {
-            return;
-        }
-
-        updateJoystick(event);
-    }
-
-    function onJoystickEnd(event) {
-        if (event.pointerId !== joystick.pointerId) {
-            return;
-        }
-
-        resetJoystick();
-    }
-
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-
-    if (joystickBase) {
-        joystickBase.addEventListener("pointerdown", onJoystickDown);
-        joystickBase.addEventListener("pointermove", onJoystickMove);
-        joystickBase.addEventListener("pointerup", onJoystickEnd);
-        joystickBase.addEventListener("pointercancel", onJoystickEnd);
-        joystickBase.addEventListener("lostpointercapture", resetJoystick);
-    }
 
     return {
         get throttle() {
             const keyboardThrottle = Number(pressed.has("KeyW")) - Number(pressed.has("KeyS"));
-            return clamp(keyboardThrottle + joystick.throttle, -1, 1);
+            return clamp(keyboardThrottle + getMobileMoveInput().forward, -1, 1);
         },
         get steering() {
             const keyboardSteering = Number(pressed.has("KeyD")) - Number(pressed.has("KeyA"));
-            return clamp(keyboardSteering + joystick.steering, -1, 1);
+            return clamp(keyboardSteering + getMobileMoveInput().right, -1, 1);
         },
         dispose() {
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("keyup", onKeyUp);
-
-            if (joystickBase) {
-                joystickBase.removeEventListener("pointerdown", onJoystickDown);
-                joystickBase.removeEventListener("pointermove", onJoystickMove);
-                joystickBase.removeEventListener("pointerup", onJoystickEnd);
-                joystickBase.removeEventListener("pointercancel", onJoystickEnd);
-                joystickBase.removeEventListener("lostpointercapture", resetJoystick);
-            }
         },
     };
 }

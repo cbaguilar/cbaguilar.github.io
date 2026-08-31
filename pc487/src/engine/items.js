@@ -5,7 +5,11 @@ export function createItemSystem({ scene, playerController, audioSystem, onInven
     const input = createInputState();
     const inventory = [];
     const pickups = [
-        createGunPickup(scene, new BABYLON.Vector3(2.6, 0.9, 1.4)),
+        createStickPickup(scene, new BABYLON.Vector3(-6, 0.72, 10)),
+        createRockPickup(scene, new BABYLON.Vector3(13, 0.55, 5)),
+        createStickPickup(scene, new BABYLON.Vector3(26, 0.72, -12)),
+        createRockPickup(scene, new BABYLON.Vector3(39, 0.55, 15)),
+        createGunPickup(scene, new BABYLON.Vector3(42, 0.9, 28)),
     ];
 
     const observer = scene.onBeforeRenderObservable.add(() => {
@@ -49,6 +53,62 @@ function createGunPickup(scene, position) {
         label: "Pistol",
         mesh,
         gun,
+        marker,
+        bobTime: 0,
+        collected: false,
+    };
+}
+
+function createStickPickup(scene, position) {
+    const mesh = new BABYLON.TransformNode("pickupStickRoot", scene);
+    mesh.position.copyFrom(position);
+
+    const marker = createPickupMarker(scene);
+    marker.parent = mesh;
+
+    const stick = BABYLON.MeshBuilder.CreateCylinder("pickupStick", {
+        diameter: 0.12,
+        height: 1.35,
+        tessellation: 7,
+    }, scene);
+    stick.parent = mesh;
+    stick.position.y = 0.22;
+    stick.rotation.z = BABYLON.Tools.ToRadians(72);
+    stick.rotation.x = BABYLON.Tools.ToRadians(8);
+    stick.material = makeMaterial(scene, "pickupStickWood", 0.34, 0.2, 0.09);
+
+    return {
+        id: "stick",
+        label: "Stick",
+        mesh,
+        gun: stick,
+        marker,
+        bobTime: 0,
+        collected: false,
+    };
+}
+
+function createRockPickup(scene, position) {
+    const mesh = new BABYLON.TransformNode("pickupRockRoot", scene);
+    mesh.position.copyFrom(position);
+
+    const marker = createPickupMarker(scene);
+    marker.parent = mesh;
+
+    const rock = BABYLON.MeshBuilder.CreateSphere("pickupRock", {
+        diameter: 0.62,
+        segments: 8,
+    }, scene);
+    rock.parent = mesh;
+    rock.position.y = 0.05;
+    rock.scaling.set(1.25, 0.65, 0.9);
+    rock.material = makeMaterial(scene, "pickupRockStone", 0.34, 0.33, 0.3);
+
+    return {
+        id: "rock",
+        label: "Rock",
+        mesh,
+        gun: rock,
         marker,
         bobTime: 0,
         collected: false,
@@ -189,6 +249,17 @@ export function createEquippedGunMesh(scene) {
     mesh.scaling.setAll(0.72);
     mesh.rotation.x = BABYLON.Tools.ToRadians(90);
     return mesh;
+}
+
+export function createEquippedStickMesh(scene) {
+    const stick = BABYLON.MeshBuilder.CreateCylinder("equippedStick", {
+        diameter: 0.09,
+        height: 1.45,
+        tessellation: 7,
+    }, scene);
+    stick.material = makeMaterial(scene, "equippedStickWood", 0.34, 0.2, 0.09);
+    stick.rotation.x = BABYLON.Tools.ToRadians(15);
+    return stick;
 }
 
 function addBox(scene, parent, name, size, position, material) {

@@ -50,8 +50,7 @@ try {
     await waitForExpression(cdp, "window.__pc487?.testControls && window.__pc487.scene?.isReady()", 15000);
     await cdp.send("Runtime.evaluate", {
         expression: `
-            window.__pc487.testControls.grantPistol();
-            window.__pc487.testControls.enterVehicle();
+            window.__pc487.testControls.grantStick();
             window.__pc487.__shotsBefore = window.__pc487.testControls.shotsFired;
             document.querySelector("#render-canvas").dispatchEvent(new PointerEvent("pointerdown", {
                 button: 0,
@@ -72,6 +71,8 @@ try {
     await cdp.send("Runtime.evaluate", {
         expression: `
             await new Promise((resolve) => setTimeout(resolve, 350));
+            window.__pc487.testControls.grantPistol();
+            window.__pc487.testControls.enterVehicle();
             window.__pc487.__shotsBefore = window.__pc487.testControls.shotsFired;
             document.querySelector("#mobile-shoot").dispatchEvent(new PointerEvent("pointerdown", {
                 button: 0,
@@ -88,11 +89,57 @@ try {
         3000,
     );
 
+    await cdp.send("Runtime.evaluate", {
+        expression: `
+            window.__pc487.testControls.damageVehicle(50);
+            window.__pc487.testControls.damageVehicle(30);
+            window.__pc487.testControls.damageVehicle(30);
+        `,
+    });
+    await waitForExpression(
+        cdp,
+        "window.__pc487.scene.particleSystems.some((system) => system.name === 'truckSmoke')",
+        3000,
+    );
+    await waitForExpression(
+        cdp,
+        "window.__pc487.scene.particleSystems.some((system) => system.name === 'truckFire')",
+        3000,
+    );
+    await waitForExpression(
+        cdp,
+        "window.__pc487.scene.meshes.some((mesh) => mesh.name === 'truckExplosionFlash')",
+        3000,
+    );
+    await cdp.send("Runtime.evaluate", {
+        expression: `
+            document.querySelector("#debug-noclip").click();
+            document.querySelector("#debug-teleport").click();
+        `,
+    });
+    await waitForExpression(
+        cdp,
+        "window.__pc487.testControls.noclip === true && window.__pc487.testControls.distanceToVehicle < 12",
+        3000,
+    );
+    await cdp.send("Runtime.evaluate", {
+        expression: "window.__pc487.testControls.enterHorse()",
+    });
+    await waitForExpression(
+        cdp,
+        "window.__pc487.testControls.activeMountLabel === 'Horse' && window.__pc487.testControls.playerActive === false",
+        3000,
+    );
+    await cdp.send("Runtime.evaluate", {
+        expression: "new Promise((resolve) => setTimeout(resolve, 500))",
+        awaitPromise: true,
+    });
+
     if (failures.length > 0) {
         throw new Error(failures.join("\n"));
     }
 
-    console.log("PC487 smoke passed: loaded, entered vehicle, fired pistol, no uncaught browser errors.");
+    console.log("PC487 smoke passed: loaded, entered vehicle, mounted horse, fired pistol, no uncaught browser errors.");
 } finally {
     chrome.kill("SIGTERM");
 }

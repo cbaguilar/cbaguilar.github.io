@@ -109,7 +109,9 @@ h1 {
     font-weight: 650;
 }
 
-#debug-toggle {
+#debug-toggle,
+#debug-teleport,
+#debug-noclip {
     min-width: 84px;
     min-height: 42px;
     padding: 0 14px;
@@ -120,7 +122,8 @@ h1 {
     cursor: pointer;
 }
 
-#debug-toggle[aria-pressed="true"] {
+#debug-toggle[aria-pressed="true"],
+#debug-noclip[aria-pressed="true"] {
     border-color: var(--accent);
     color: var(--accent);
 }

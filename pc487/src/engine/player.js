@@ -1,4 +1,5 @@
-import { createEquippedGunMesh } from "./items.js";
+import { createEquippedGunMesh, createEquippedStickMesh } from "./items.js";
+import { getMobileMoveInput } from "./mobileInput.js";
 
 const PLAYER_HEIGHT = 2;
 const PLAYER_HALF_HEIGHT = PLAYER_HEIGHT / 2;
@@ -15,13 +16,14 @@ export function createPlayerController({ scene, camera, collisionWorld }) {
     const movement = new BABYLON.Vector3();
     const desiredDirection = new BABYLON.Vector3();
     let active = true;
+    let noclip = false;
 
     mesh.position.set(0, PLAYER_HALF_HEIGHT, 0);
     loadPlayerModel(scene, mesh);
 
     const observer = scene.onBeforeRenderObservable.add(() => {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-        updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, deltaSeconds });
+        updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, noclip, deltaSeconds });
     });
 
     return {
@@ -45,6 +47,12 @@ export function createPlayerController({ scene, camera, collisionWorld }) {
             active = nextActive;
             mesh.setEnabled(nextActive);
             movement.copyFromFloats(0, 0, 0);
+        },
+        get noclip() {
+            return noclip;
+        },
+        setNoclip(nextNoclip) {
+            noclip = nextNoclip;
         },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
@@ -222,7 +230,7 @@ function makeMaterial(scene, name, r, g, b) {
 }
 
 function equipItem({ scene, playerModel, itemId }) {
-    if (!playerModel?.rightHandSocket || itemId !== "pistol") {
+    if (!playerModel?.rightHandSocket || !["pistol", "stick"].includes(itemId)) {
         return;
     }
 
@@ -230,26 +238,18 @@ function equipItem({ scene, playerModel, itemId }) {
         playerModel.equippedMesh.dispose(false, true);
     }
 
-    const gun = createEquippedGunMesh(scene);
-    gun.parent = playerModel.rightHandSocket;
-    gun.position.set(0.02, -0.04, 0.16);
-    gun.rotation.y = BABYLON.Tools.ToRadians(4);
-    playerModel.equippedMesh = gun;
+    const item = itemId === "pistol"
+        ? createEquippedGunMesh(scene)
+        : createEquippedStickMesh(scene);
+    item.parent = playerModel.rightHandSocket;
+    item.position.set(0.02, -0.04, 0.16);
+    item.rotation.y = BABYLON.Tools.ToRadians(itemId === "pistol" ? 4 : -18);
+    item.rotation.z = BABYLON.Tools.ToRadians(itemId === "pistol" ? 0 : -32);
+    playerModel.equippedMesh = item;
 }
 
 function createInputState() {
     const pressed = new Set();
-    const joystick = {
-        active: false,
-        pointerId: null,
-        centerX: 0,
-        centerY: 0,
-        forward: 0,
-        right: 0,
-    };
-    const joystickBase = document.querySelector("#move-joystick");
-    const joystickStick = document.querySelector("#move-stick");
-    const joystickRadius = 52;
 
     function onKeyDown(event) {
         pressed.add(event.code);
@@ -259,104 +259,26 @@ function createInputState() {
         pressed.delete(event.code);
     }
 
-    function updateJoystick(event) {
-        const rawX = event.clientX - joystick.centerX;
-        const rawY = event.clientY - joystick.centerY;
-        const distance = Math.hypot(rawX, rawY);
-        const scale = distance > joystickRadius ? joystickRadius / distance : 1;
-        const x = rawX * scale;
-        const y = rawY * scale;
-
-        joystick.right = clamp(x / joystickRadius, -1, 1);
-        joystick.forward = clamp(-y / joystickRadius, -1, 1);
-
-        if (joystickStick) {
-            joystickStick.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-        }
-    }
-
-    function resetJoystick() {
-        joystick.active = false;
-        joystick.pointerId = null;
-        joystick.forward = 0;
-        joystick.right = 0;
-
-        if (joystickBase) {
-            joystickBase.classList.add("joystick-resting");
-        }
-
-        if (joystickStick) {
-            joystickStick.style.transform = "translate(-50%, -50%)";
-        }
-    }
-
-    function onJoystickDown(event) {
-        const bounds = joystickBase.getBoundingClientRect();
-        joystick.active = true;
-        joystick.pointerId = event.pointerId;
-        joystick.centerX = bounds.left + bounds.width / 2;
-        joystick.centerY = bounds.top + bounds.height / 2;
-        joystickBase.classList.remove("joystick-resting");
-        joystickBase.setPointerCapture(event.pointerId);
-        updateJoystick(event);
-        event.preventDefault();
-    }
-
-    function onJoystickMove(event) {
-        if (!joystick.active || event.pointerId !== joystick.pointerId) {
-            return;
-        }
-
-        updateJoystick(event);
-        event.preventDefault();
-    }
-
-    function onJoystickEnd(event) {
-        if (event.pointerId !== joystick.pointerId) {
-            return;
-        }
-
-        resetJoystick();
-        event.preventDefault();
-    }
-
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-
-    if (joystickBase) {
-        joystickBase.classList.add("joystick-resting");
-        joystickBase.addEventListener("pointerdown", onJoystickDown);
-        joystickBase.addEventListener("pointermove", onJoystickMove);
-        joystickBase.addEventListener("pointerup", onJoystickEnd);
-        joystickBase.addEventListener("pointercancel", onJoystickEnd);
-        joystickBase.addEventListener("lostpointercapture", resetJoystick);
-    }
 
     return {
         get forward() {
             const keyboardForward = Number(pressed.has("KeyW")) - Number(pressed.has("KeyS"));
-            return clamp(keyboardForward + joystick.forward, -1, 1);
+            return clamp(keyboardForward + getMobileMoveInput().forward, -1, 1);
         },
         get right() {
             const keyboardRight = Number(pressed.has("KeyD")) - Number(pressed.has("KeyA"));
-            return clamp(keyboardRight + joystick.right, -1, 1);
+            return clamp(keyboardRight + getMobileMoveInput().right, -1, 1);
         },
         dispose() {
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("keyup", onKeyUp);
-
-            if (joystickBase) {
-                joystickBase.removeEventListener("pointerdown", onJoystickDown);
-                joystickBase.removeEventListener("pointermove", onJoystickMove);
-                joystickBase.removeEventListener("pointerup", onJoystickEnd);
-                joystickBase.removeEventListener("pointercancel", onJoystickEnd);
-                joystickBase.removeEventListener("lostpointercapture", resetJoystick);
-            }
         },
     };
 }
 
-function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, deltaSeconds }) {
+function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, noclip, deltaSeconds }) {
     if (!active) {
         return;
     }
@@ -394,8 +316,10 @@ function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDi
     const previousPosition = mesh.position.clone();
     mesh.position.x = clamp(mesh.position.x + movement.x * deltaSeconds, -WORLD_LIMIT, WORLD_LIMIT);
     mesh.position.z = clamp(mesh.position.z + movement.z * deltaSeconds, -WORLD_LIMIT, WORLD_LIMIT);
-    const resolvedPosition = collisionWorld.resolveCircleMovement(mesh.position, previousPosition, PLAYER_COLLISION_RADIUS);
-    const collided = resolvedPosition.x !== mesh.position.x || resolvedPosition.z !== mesh.position.z;
+    const resolvedPosition = noclip
+        ? mesh.position
+        : collisionWorld.resolveCircleMovement(mesh.position, previousPosition, PLAYER_COLLISION_RADIUS);
+    const collided = !noclip && (resolvedPosition.x !== mesh.position.x || resolvedPosition.z !== mesh.position.z);
     mesh.position.x = resolvedPosition.x;
     mesh.position.z = resolvedPosition.z;
     mesh.position.y = PLAYER_HALF_HEIGHT;

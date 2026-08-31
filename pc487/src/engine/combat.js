@@ -1,7 +1,11 @@
 const PISTOL_DAMAGE = 34;
 const PISTOL_RANGE = 42;
 const PISTOL_COOLDOWN_SECONDS = 0.32;
+const STICK_DAMAGE = 18;
+const STICK_RANGE = 4.4;
+const STICK_COOLDOWN_SECONDS = 0.48;
 const AIM_CONE_DOT = 0.94;
+const MELEE_CONE_DOT = 0.56;
 
 export function createCombatSystem({ scene, playerController, vehicleController, itemSystem, npcSystem, audioSystem, onPromptChange }) {
     const input = createInputState(scene.getEngine().getRenderingCanvas());
@@ -48,8 +52,10 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
         return;
     }
 
-    if (!itemSystem.hasItem("pistol")) {
-        showCombatMessage(onPromptChange, state, "Pick up the pistol first");
+    const weapon = getActiveWeapon(itemSystem);
+
+    if (!weapon) {
+        showCombatMessage(onPromptChange, state, "Find a stick or rock first");
         return;
     }
 
@@ -57,7 +63,7 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
         return;
     }
 
-    state.cooldown = PISTOL_COOLDOWN_SECONDS;
+    state.cooldown = weapon.cooldown;
     state.shotsFired += 1;
     const aimPoint = shootRequest.pointer
         ? getGroundAimPoint(scene, shootRequest.pointer.x, shootRequest.pointer.y)
@@ -65,35 +71,65 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
     const shooter = getActiveShooter({ playerController, vehicleController, npcSystem, aimPoint });
 
     shooter.animate();
-    audioSystem.playGunshot();
+
+    if (weapon.id === "pistol") {
+        audioSystem.playGunshot();
+    }
 
     const shot = shooter.getShotVector();
     const hit = npcSystem.findTarget({
         origin: shot.origin,
         direction: shot.direction,
-        range: PISTOL_RANGE,
-        minDot: AIM_CONE_DOT,
+        range: weapon.range,
+        minDot: weapon.minDot,
     });
 
-    const tracerEnd = hit
-        ? hit.npc.proxy.position.add(new BABYLON.Vector3(0, 0.9, 0))
-        : shot.origin.add(shot.direction.scale(PISTOL_RANGE));
-
-    createTracer(scene, shot.origin, tracerEnd, Boolean(hit));
+    if (weapon.id === "pistol") {
+        const tracerEnd = hit
+            ? hit.npc.proxy.position.add(new BABYLON.Vector3(0, 0.9, 0))
+            : shot.origin.add(shot.direction.scale(weapon.range));
+        createTracer(scene, shot.origin, tracerEnd, Boolean(hit));
+    } else {
+        createStickSwing(scene, shot.origin, shot.direction, Boolean(hit));
+    }
 
     if (!hit) {
-        showCombatMessage(onPromptChange, state, "Miss");
+        showCombatMessage(onPromptChange, state, weapon.id === "stick" ? "Swung wide" : "Miss");
         return;
     }
 
     const wasDefeated = hit.npc.defeated;
-    const result = npcSystem.damageNpc(hit.npc, PISTOL_DAMAGE);
+    const result = npcSystem.damageNpc(hit.npc, weapon.damage);
 
     if (!wasDefeated && result.defeated) {
         audioSystem.playNpcKnockdown();
     }
 
     showCombatMessage(onPromptChange, state, result.defeated ? "NPC down" : `Hit NPC (${result.health} HP)`);
+}
+
+function getActiveWeapon(itemSystem) {
+    if (itemSystem.hasItem("pistol")) {
+        return {
+            id: "pistol",
+            damage: PISTOL_DAMAGE,
+            range: PISTOL_RANGE,
+            cooldown: PISTOL_COOLDOWN_SECONDS,
+            minDot: AIM_CONE_DOT,
+        };
+    }
+
+    if (itemSystem.hasItem("stick")) {
+        return {
+            id: "stick",
+            damage: STICK_DAMAGE,
+            range: STICK_RANGE,
+            cooldown: STICK_COOLDOWN_SECONDS,
+            minDot: MELEE_CONE_DOT,
+        };
+    }
+
+    return null;
 }
 
 function getActiveShooter({ playerController, vehicleController, npcSystem, aimPoint }) {
@@ -225,6 +261,33 @@ function createTracer(scene, start, end, hit) {
         tracer.dispose();
         material.dispose();
     }, 85);
+}
+
+function createStickSwing(scene, origin, direction, hit) {
+    const side = new BABYLON.Vector3(direction.z, 0, -direction.x).normalize();
+    const center = origin.add(direction.scale(2.35));
+    const start = center.add(side.scale(-1.25));
+    const end = center.add(side.scale(1.25));
+    const swing = BABYLON.MeshBuilder.CreateTube(
+        "stickSwing",
+        {
+            path: [start, center.add(new BABYLON.Vector3(0, 0.25, 0)), end],
+            radius: hit ? 0.055 : 0.035,
+            tessellation: 6,
+        },
+        scene,
+    );
+    const material = new BABYLON.StandardMaterial("stickSwingMaterial", scene);
+    material.emissiveColor = hit
+        ? new BABYLON.Color3(1, 0.72, 0.18)
+        : new BABYLON.Color3(0.72, 0.52, 0.25);
+    material.diffuseColor = material.emissiveColor;
+    swing.material = material;
+
+    window.setTimeout(() => {
+        swing.dispose();
+        material.dispose();
+    }, 120);
 }
 
 function showCombatMessage(onPromptChange, state, message) {
