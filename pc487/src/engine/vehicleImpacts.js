@@ -56,15 +56,11 @@ function updateVehicleImpacts({ vehicleController, npcSystem, audioSystem, hitTi
         }
 
         const impulse = calculateImpactImpulse(vehicleController, npc, vehicleSpeed);
-        const wasDefeated = npc.defeated;
         const result = npc.defeated
             ? { health: 0, defeated: true }
             : npcSystem.damageNpc(npc, calculateImpactDamage(vehicleSpeed));
 
-        if (!wasDefeated && result.defeated) {
-            audioSystem.playNpcKnockdown();
-        }
-
+        audioSystem.playVehicleNpcHit();
         npcSystem.applyImpulseToNpc(npc, impulse);
         hitTimers.set(npc, HIT_COOLDOWN_SECONDS);
         onPromptChange(result.defeated ? "Vehicle impact: NPC down" : `Vehicle impact: ${result.health} HP`, { holdMs: 900 });

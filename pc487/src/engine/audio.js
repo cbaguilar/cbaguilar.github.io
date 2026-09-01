@@ -19,6 +19,9 @@ export function createAudioSystem() {
         playNpcKnockdown() {
             sounds.npcKnockdown.play();
         },
+        playVehicleNpcHit() {
+            sounds.npcKnockdown.play();
+        },
         playStickSwing() {
             sounds.stickSwing.play();
         },
