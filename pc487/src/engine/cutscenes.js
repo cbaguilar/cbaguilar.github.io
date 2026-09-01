@@ -2,6 +2,8 @@ const INTRO_LINE = "wake up dawg, you can't sleep here, this is my mudpit! Get o
 const INTRO_PLAYER_POSITION = new BABYLON.Vector3(-15.4, 0.44, 5.2);
 const INTRO_NPC_START = new BABYLON.Vector3(-20.2, 1, 8.7);
 const INTRO_NPC_END = new BABYLON.Vector3(-16.9, 1, 6.8);
+const INTRO_FADE_HOLD_MS = 500;
+const INTRO_SLEEPING_HOLD_MS = 1600;
 
 export function createCutsceneSystem({ scene, camera, playerController, onPromptChange }) {
     const gameShell = document.querySelector("#game-shell");
@@ -54,9 +56,9 @@ export function createCutsceneSystem({ scene, camera, playerController, onPrompt
         camera.beta = BABYLON.Tools.ToRadians(67);
         camera.radius = 4.6;
 
-        await sleep(250);
+        await sleep(INTRO_FADE_HOLD_MS);
         fade.style.opacity = "0";
-        await sleep(800);
+        await sleep(INTRO_SLEEPING_HOLD_MS);
         await walkNpcTo(scene, friendlyNpc, {
             from: INTRO_NPC_START,
             to: INTRO_NPC_END,
