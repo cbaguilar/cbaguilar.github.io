@@ -78,6 +78,8 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
 
     if (weapon.id === "pistol") {
         audioSystem.playGunshot();
+    } else if (weapon.id === "stick") {
+        audioSystem.playStickSwing();
     }
 
     const shot = shooter.getShotVector();
