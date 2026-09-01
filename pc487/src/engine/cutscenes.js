@@ -1,4 +1,7 @@
 const INTRO_LINE = "wake up dawg, you can't sleep here, this is my mudpit! Get out!";
+const INTRO_PLAYER_POSITION = new BABYLON.Vector3(-15.4, 0.44, 5.2);
+const INTRO_NPC_START = new BABYLON.Vector3(-20.2, 1, 8.7);
+const INTRO_NPC_END = new BABYLON.Vector3(-16.9, 1, 6.8);
 
 export function createCutsceneSystem({ scene, camera, playerController, onPromptChange }) {
     const gameShell = document.querySelector("#game-shell");
@@ -10,6 +13,7 @@ export function createCutsceneSystem({ scene, camera, playerController, onPrompt
     const dialogueNext = document.querySelector("#dialogue-next");
     const focusTarget = new BABYLON.TransformNode("cutsceneFocusTarget", scene);
     const friendlyNpc = createFriendlyMudpitNpc(scene);
+    const dirtPatch = createIntroDirtPatch(scene);
     let active = false;
     let started = false;
     let disposed = false;
@@ -35,35 +39,35 @@ export function createCutsceneSystem({ scene, camera, playerController, onPrompt
 
         playerController.setActive(true);
         playerController.setControlsEnabled(false);
-        playerController.mesh.position.set(5.7, 0.44, 8.6);
-        playerController.mesh.rotation.y = BABYLON.Tools.ToRadians(34);
+        playerController.mesh.position.copyFrom(INTRO_PLAYER_POSITION);
+        playerController.mesh.rotation.y = BABYLON.Tools.ToRadians(-30);
         playerController.setCutscenePose("lying");
 
         friendlyNpc.root.setEnabled(true);
-        friendlyNpc.root.position.set(1.1, 1, 12.2);
-        friendlyNpc.root.rotation.y = BABYLON.Tools.ToRadians(-150);
+        friendlyNpc.root.position.copyFrom(INTRO_NPC_START);
+        friendlyNpc.root.rotation.y = BABYLON.Tools.ToRadians(120);
         friendlyNpc.setWalkAmount(0);
 
-        focusTarget.position.copyFrom(playerController.mesh.position).addInPlace(new BABYLON.Vector3(-0.3, 1.1, 0.2));
+        focusTarget.position.copyFrom(playerController.mesh.position).addInPlace(new BABYLON.Vector3(-0.2, 1.1, 0.15));
         camera.lockedTarget = focusTarget;
-        camera.alpha = BABYLON.Tools.ToRadians(132);
-        camera.beta = BABYLON.Tools.ToRadians(72);
-        camera.radius = 5.2;
+        camera.alpha = BABYLON.Tools.ToRadians(32);
+        camera.beta = BABYLON.Tools.ToRadians(67);
+        camera.radius = 4.6;
 
         await sleep(250);
         fade.style.opacity = "0";
         await sleep(800);
         await walkNpcTo(scene, friendlyNpc, {
-            from: new BABYLON.Vector3(1.1, 1, 12.2),
-            to: new BABYLON.Vector3(4.1, 1, 10.2),
+            from: INTRO_NPC_START,
+            to: INTRO_NPC_END,
             durationMs: 1150,
             focusTarget,
         });
 
         focusTarget.position.copyFrom(friendlyNpc.root.position).addInPlace(new BABYLON.Vector3(0, 1.4, 0));
-        camera.alpha = BABYLON.Tools.ToRadians(152);
-        camera.beta = BABYLON.Tools.ToRadians(70);
-        camera.radius = 4.8;
+        camera.alpha = BABYLON.Tools.ToRadians(54);
+        camera.beta = BABYLON.Tools.ToRadians(68);
+        camera.radius = 4.9;
         playerController.setCutscenePose("dazed");
 
         await showDialogue({
@@ -104,9 +108,25 @@ export function createCutsceneSystem({ scene, camera, playerController, onPrompt
         dispose() {
             disposed = true;
             friendlyNpc.root.dispose(false, true);
+            dirtPatch.dispose();
             focusTarget.dispose();
         },
     };
+}
+
+function createIntroDirtPatch(scene) {
+    const material = makeMaterial(scene, "introClearingDirt", 0.31, 0.2, 0.12);
+    material.specularColor = new BABYLON.Color3(0.08, 0.055, 0.035);
+    const patch = BABYLON.MeshBuilder.CreateDisc("introWakeupDirtPatch", {
+        radius: 3.1,
+        tessellation: 24,
+    }, scene);
+    patch.position.set(INTRO_PLAYER_POSITION.x, 0.075, INTRO_PLAYER_POSITION.z);
+    patch.rotation.x = BABYLON.Tools.ToRadians(90);
+    patch.rotation.z = BABYLON.Tools.ToRadians(18);
+    patch.scaling.z = 0.68;
+    patch.material = material;
+    return patch;
 }
 
 function shouldSkipIntro() {
