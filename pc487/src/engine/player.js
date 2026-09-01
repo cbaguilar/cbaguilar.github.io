@@ -16,6 +16,7 @@ export function createPlayerController({ scene, camera, collisionWorld }) {
     const movement = new BABYLON.Vector3();
     const desiredDirection = new BABYLON.Vector3();
     let active = true;
+    let controlsEnabled = true;
     let noclip = false;
 
     mesh.position.set(0, PLAYER_HALF_HEIGHT, 0);
@@ -23,13 +24,16 @@ export function createPlayerController({ scene, camera, collisionWorld }) {
 
     const observer = scene.onBeforeRenderObservable.add(() => {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-        updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, noclip, deltaSeconds });
+        updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, controlsEnabled, noclip, deltaSeconds });
     });
 
     return {
         mesh,
         get active() {
             return active;
+        },
+        get controlsEnabled() {
+            return controlsEnabled;
         },
         equipItem(itemId) {
             equipItem({ scene, playerModel: mesh.metadata, itemId });
@@ -47,6 +51,13 @@ export function createPlayerController({ scene, camera, collisionWorld }) {
             active = nextActive;
             mesh.setEnabled(nextActive);
             movement.copyFromFloats(0, 0, 0);
+        },
+        setControlsEnabled(nextEnabled) {
+            controlsEnabled = nextEnabled;
+            movement.copyFromFloats(0, 0, 0);
+        },
+        setCutscenePose(poseName) {
+            applyCutscenePose(mesh, poseName);
         },
         get noclip() {
             return noclip;
@@ -281,8 +292,13 @@ function createInputState() {
     };
 }
 
-function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, noclip, deltaSeconds }) {
+function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, controlsEnabled, noclip, deltaSeconds }) {
     if (!active) {
+        return;
+    }
+
+    if (!controlsEnabled) {
+        movement.copyFromFloats(0, 0, 0);
         return;
     }
 
@@ -332,6 +348,47 @@ function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDi
     }
 
     updateBlockHumanoid(mesh.metadata, movement, deltaSeconds);
+}
+
+function applyCutscenePose(mesh, poseName) {
+    const playerModel = mesh.metadata;
+    mesh.rotation.x = 0;
+    mesh.rotation.z = 0;
+    mesh.position.y = PLAYER_HALF_HEIGHT;
+
+    if (playerModel?.fallbackModel) {
+        playerModel.fallbackModel.position.y = -PLAYER_HALF_HEIGHT;
+        playerModel.torso.rotation.x = 0;
+        playerModel.leftArm.rotation.x = 0;
+        playerModel.leftArm.rotation.z = 0;
+        playerModel.rightArm.rotation.x = 0;
+        playerModel.rightArm.rotation.z = 0;
+        playerModel.leftLeg.rotation.x = 0;
+        playerModel.rightLeg.rotation.x = 0;
+    }
+
+    if (poseName === "lying") {
+        mesh.rotation.z = BABYLON.Tools.ToRadians(86);
+        mesh.rotation.x = BABYLON.Tools.ToRadians(-4);
+        mesh.position.y = 0.44;
+
+        if (playerModel?.fallbackModel) {
+            playerModel.torso.rotation.x = BABYLON.Tools.ToRadians(-8);
+            playerModel.leftArm.rotation.x = BABYLON.Tools.ToRadians(18);
+            playerModel.rightArm.rotation.x = BABYLON.Tools.ToRadians(-22);
+            playerModel.leftLeg.rotation.x = BABYLON.Tools.ToRadians(9);
+            playerModel.rightLeg.rotation.x = BABYLON.Tools.ToRadians(-13);
+        }
+        return;
+    }
+
+    if (poseName === "dazed" && playerModel?.fallbackModel) {
+        playerModel.torso.rotation.x = BABYLON.Tools.ToRadians(7);
+        playerModel.leftArm.rotation.x = BABYLON.Tools.ToRadians(16);
+        playerModel.rightArm.rotation.x = BABYLON.Tools.ToRadians(14);
+        playerModel.leftLeg.rotation.x = BABYLON.Tools.ToRadians(-4);
+        playerModel.rightLeg.rotation.x = BABYLON.Tools.ToRadians(4);
+    }
 }
 
 function updateBlockHumanoid(playerModel, movement, deltaSeconds) {

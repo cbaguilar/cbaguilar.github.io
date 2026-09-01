@@ -31,6 +31,10 @@ button {
     font: inherit;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 #game-shell {
     position: fixed;
     inset: 0;
@@ -258,6 +262,74 @@ h1 {
     display: block;
 }
 
+#cutscene-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: auto;
+}
+
+#cutscene-fade {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 1;
+    transition: opacity 1200ms ease;
+}
+
+#dialogue-box {
+    position: absolute;
+    left: max(18px, env(safe-area-inset-left));
+    right: max(18px, env(safe-area-inset-right));
+    bottom: max(20px, calc(env(safe-area-inset-bottom) + 18px));
+    max-width: 780px;
+    min-height: 122px;
+    margin: 0 auto;
+    padding: 16px 18px 14px;
+    border: 2px solid rgb(245 240 232 / 78%);
+    border-radius: 6px;
+    background: rgb(12 13 15 / 88%);
+    box-shadow: 0 18px 50px rgb(0 0 0 / 44%);
+}
+
+#dialogue-speaker {
+    margin: 0 0 7px;
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+#dialogue-text {
+    max-width: calc(100% - 96px);
+    margin: 0;
+    color: var(--fg);
+    font-size: clamp(1.05rem, 2.2vh, 1.3rem);
+    font-weight: 650;
+    line-height: 1.32;
+}
+
+#dialogue-next {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    min-width: 74px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid rgb(245 240 232 / 24%);
+    border-radius: 4px;
+    background: rgb(239 191 99 / 90%);
+    color: #14110b;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+#game-shell.is-cutscene #hud,
+#game-shell.is-cutscene #mobile-controls {
+    display: none;
+}
+
 #game-shell.is-driving #mobile-pickup {
     display: none;
 }
@@ -301,6 +373,18 @@ h1 {
 
     .hud-note {
         font-size: 0.85rem;
+    }
+
+    #dialogue-box {
+        left: 12px;
+        right: 12px;
+        min-height: 136px;
+        padding: 14px 14px 60px;
+    }
+
+    #dialogue-text {
+        max-width: none;
+        font-size: 1.02rem;
     }
 }
 

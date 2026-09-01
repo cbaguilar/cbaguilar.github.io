@@ -1,6 +1,7 @@
 import { createCombatSystem } from "./combat.js";
 import { createAudioSystem } from "./audio.js";
 import { createCollisionWorld } from "./collision.js";
+import { createCutsceneSystem } from "./cutscenes.js";
 import { createItemSystem } from "./items.js";
 import { createNpcSystem } from "./npcs.js";
 import { createPlayerController } from "./player.js";
@@ -60,6 +61,7 @@ export function createPc487App({ canvas }) {
         });
 
         window.addEventListener("resize", resize);
+        sceneState.cutsceneSystem.startOpeningCutscene();
     }
 
     function resize() {
@@ -123,6 +125,7 @@ export function createPc487App({ canvas }) {
     function dispose() {
         window.removeEventListener("resize", resize);
         sceneState.dispose();
+        sceneState.cutsceneSystem.dispose();
         sceneState.combatSystem.dispose();
         sceneState.vehicleImpactSystem.dispose();
         sceneState.vehicleAudioController.dispose();
@@ -194,6 +197,7 @@ function createScene(engine, canvas) {
         itemSystem: null,
         npcSystem: null,
         combatSystem: null,
+        cutsceneSystem: null,
         vehicleImpactSystem: null,
         vehicleAudioController: null,
         cameraRegionController: null,
@@ -236,6 +240,12 @@ function createScene(engine, canvas) {
     });
     sceneState.vehicleAudioController = createVehicleAudioController(sceneState);
     camera.lockedTarget = sceneState.playerController.mesh;
+    sceneState.cutsceneSystem = createCutsceneSystem({
+        scene,
+        camera,
+        playerController: sceneState.playerController,
+        onPromptChange: updateInteractionPrompt,
+    });
     sceneState.dispose = createInteractionController(sceneState);
     sceneState.cameraRegionController = createCameraRegionController(sceneState);
 
@@ -352,6 +362,10 @@ function getPedestrianCameraMode(playerMesh) {
 
 function createCameraRegionController(sceneState) {
     const observer = sceneState.scene.onBeforeRenderObservable.add(() => {
+        if (sceneState.cutsceneSystem?.active) {
+            return;
+        }
+
         if (sceneState.vehicleController.active || sceneState.npcSystem.activeMount) {
             applyCameraMode(sceneState.camera, "vehicle");
             return;

@@ -52,6 +52,10 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
         return;
     }
 
+    if (playerController.active && !playerController.controlsEnabled) {
+        return;
+    }
+
     const weapon = getActiveWeapon(itemSystem);
 
     if (!weapon) {
