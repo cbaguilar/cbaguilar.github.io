@@ -107,6 +107,8 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
     const wasDefeated = hit.npc.defeated;
     const result = npcSystem.damageNpc(hit.npc, weapon.damage);
 
+    audioSystem.playHit();
+
     if (!wasDefeated && result.defeated) {
         audioSystem.playNpcKnockdown();
     }

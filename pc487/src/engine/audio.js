@@ -5,7 +5,8 @@ export function createAudioSystem() {
         equipGun: createSound(`${SOUND_PATH}lowerguncock.wav`, 0.55),
         gunshot: createSound(`${SOUND_PATH}gunshot.wav`, 0.5),
         npcKnockdown: createSound(`${SOUND_PATH}npc-knockdown.wav`, 0.62),
-        stickSwing: createSound(`${SOUND_PATH}stick-whoosh.mp3`, 0.58),
+        hit: createSound(`${SOUND_PATH}npc-knockdown.wav`, 0.48),
+        stickSwing: createSound(`${SOUND_PATH}stick-whoosh.wav`, 0.58),
         truckEngine: createLoopingSound(`${SOUND_PATH}truck-engine.mp3`, 0),
     };
 
@@ -19,8 +20,11 @@ export function createAudioSystem() {
         playNpcKnockdown() {
             sounds.npcKnockdown.play();
         },
+        playHit() {
+            sounds.hit.play();
+        },
         playVehicleNpcHit() {
-            sounds.npcKnockdown.play();
+            sounds.hit.play();
         },
         playStickSwing() {
             sounds.stickSwing.play();
