@@ -10,7 +10,7 @@ const WALK_CYCLE_SPEED = 9;
 const SHOOT_POSE_SECONDS = 0.16;
 const PLAYER_COLLISION_RADIUS = 0.48;
 
-export function createPlayerController({ scene, camera, collisionWorld }) {
+export function createPlayerController({ scene, camera, collisionWorld, terrainWorld = null }) {
     const mesh = createPlayerMesh(scene);
     const input = createInputState();
     const movement = new BABYLON.Vector3();
@@ -24,7 +24,7 @@ export function createPlayerController({ scene, camera, collisionWorld }) {
 
     const observer = scene.onBeforeRenderObservable.add(() => {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-        updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, controlsEnabled, noclip, deltaSeconds });
+        updatePlayer({ mesh, camera, collisionWorld, terrainWorld, input, movement, desiredDirection, active, controlsEnabled, noclip, deltaSeconds });
     });
 
     return {
@@ -292,7 +292,7 @@ function createInputState() {
     };
 }
 
-function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDirection, active, controlsEnabled, noclip, deltaSeconds }) {
+function updatePlayer({ mesh, camera, collisionWorld, terrainWorld, input, movement, desiredDirection, active, controlsEnabled, noclip, deltaSeconds }) {
     if (!active) {
         return;
     }
@@ -341,7 +341,7 @@ function updatePlayer({ mesh, camera, collisionWorld, input, movement, desiredDi
     const collided = !noclip && (resolvedPosition.x !== mesh.position.x || resolvedPosition.z !== mesh.position.z);
     mesh.position.x = resolvedPosition.x;
     mesh.position.z = resolvedPosition.z;
-    mesh.position.y = PLAYER_HALF_HEIGHT;
+    mesh.position.y = PLAYER_HALF_HEIGHT + (terrainWorld?.getHeightAt(mesh.position) ?? 0);
 
     if (collided) {
         movement.scaleInPlace(0.25);

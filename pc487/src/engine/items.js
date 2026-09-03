@@ -1,9 +1,12 @@
 const PICKUP_DISTANCE = 3.2;
+const ROCK_SOURCE_DISTANCE = 4.1;
+const ROCK_AMMO_MAX = 5;
 const PICKUP_BOB_SPEED = 3.8;
 
 export function createItemSystem({ scene, playerController, audioSystem, onInventoryChange, onPromptChange }) {
     const input = createInputState();
     const inventory = [];
+    let rockAmmo = 0;
     const pickups = [
         createStickPickup(scene, new BABYLON.Vector3(-6, 0.72, 10)),
         createRockPickup(scene, new BABYLON.Vector3(13, 0.55, 5)),
@@ -11,17 +14,71 @@ export function createItemSystem({ scene, playerController, audioSystem, onInven
         createRockPickup(scene, new BABYLON.Vector3(39, 0.55, 15)),
         createGunPickup(scene, new BABYLON.Vector3(42, 0.9, 28)),
     ];
+    const rockSources = [
+        createRockSource(scene, new BABYLON.Vector3(-18.5, 0, 3.4), 1.75),
+        createRockSource(scene, new BABYLON.Vector3(14.5, 0, 7.8), 1.45),
+        createRockSource(scene, new BABYLON.Vector3(35.5, 0, 18.5), 1.65),
+    ];
+
+    function getInventorySnapshot() {
+        const snapshot = [...inventory];
+
+        if (rockAmmo > 0) {
+            snapshot.push({ id: "rock", label: `Rocks x${rockAmmo}` });
+        }
+
+        return snapshot;
+    }
+
+    function notifyInventory() {
+        onInventoryChange(getInventorySnapshot());
+    }
 
     const observer = scene.onBeforeRenderObservable.add(() => {
-        updatePickups({ playerController, audioSystem, pickups, input, inventory, onInventoryChange, onPromptChange });
+        updatePickups({
+            playerController,
+            audioSystem,
+            pickups,
+            rockSources,
+            input,
+            inventory,
+            getRockAmmo() {
+                return rockAmmo;
+            },
+            setRockAmmo(nextRockAmmo) {
+                rockAmmo = nextRockAmmo;
+            },
+            notifyInventory,
+            onPromptChange,
+        });
     });
 
-    onInventoryChange([...inventory]);
+    notifyInventory();
 
     return {
         inventory,
+        get rockAmmo() {
+            return rockAmmo;
+        },
         hasItem(itemId) {
+            if (itemId === "rock") {
+                return rockAmmo > 0;
+            }
+
             return inventory.some((item) => item.id === itemId);
+        },
+        addRocks(amount) {
+            rockAmmo = Math.min(ROCK_AMMO_MAX, rockAmmo + amount);
+            notifyInventory();
+        },
+        consumeRock() {
+            if (rockAmmo <= 0) {
+                return false;
+            }
+
+            rockAmmo -= 1;
+            notifyInventory();
+            return true;
         },
         dispose() {
             scene.onBeforeRenderObservable.remove(observer);
@@ -29,6 +86,10 @@ export function createItemSystem({ scene, playerController, audioSystem, onInven
 
             for (const pickup of pickups) {
                 pickup.mesh.dispose(false, true);
+            }
+
+            for (const source of rockSources) {
+                source.mesh.dispose(false, true);
             }
         },
     };
@@ -115,7 +176,38 @@ function createRockPickup(scene, position) {
     };
 }
 
-function updatePickups({ playerController, audioSystem, pickups, input, inventory, onInventoryChange, onPromptChange }) {
+function createRockSource(scene, position, scale) {
+    const mesh = new BABYLON.TransformNode("rockSourceBoulder", scene);
+    mesh.position.copyFrom(position);
+
+    const stone = makeMaterial(scene, "rockSourceStone", 0.3, 0.29, 0.26);
+    const moss = makeMaterial(scene, "rockSourceMoss", 0.2, 0.34, 0.16);
+
+    const boulder = BABYLON.MeshBuilder.CreateSphere("rockSourceBoulderBody", {
+        diameter: scale,
+        segments: 8,
+    }, scene);
+    boulder.parent = mesh;
+    boulder.position.y = scale * 0.28;
+    boulder.scaling.set(1.25, 0.55, 0.92);
+    boulder.material = stone;
+
+    const chip = BABYLON.MeshBuilder.CreateSphere("rockSourceLooseStone", {
+        diameter: scale * 0.32,
+        segments: 6,
+    }, scene);
+    chip.parent = mesh;
+    chip.position.set(scale * 0.72, scale * 0.12, scale * 0.25);
+    chip.scaling.set(1.1, 0.55, 0.85);
+    chip.material = moss;
+
+    return {
+        mesh,
+        bobTime: 0,
+    };
+}
+
+function updatePickups({ playerController, audioSystem, pickups, rockSources, input, inventory, getRockAmmo, setRockAmmo, notifyInventory, onPromptChange }) {
     if (!playerController.active) {
         onPromptChange("");
         input.setPickupAvailable(false);
@@ -129,9 +221,31 @@ function updatePickups({ playerController, audioSystem, pickups, input, inventor
     ));
 
     if (!nearbyPickup) {
-        onPromptChange("");
-        input.setPickupAvailable(false);
-        input.consumePickup();
+        const nearbyRockSource = rockSources.find((source) => (
+            BABYLON.Vector3.Distance(playerController.mesh.position, source.mesh.position) <= ROCK_SOURCE_DISTANCE
+        ));
+
+        if (!nearbyRockSource) {
+            onPromptChange("");
+            input.setPickupAvailable(false);
+            input.consumePickup();
+            return;
+        }
+
+        input.setPickupAvailable(true);
+        const rockAmmo = getRockAmmo();
+        onPromptChange(rockAmmo >= ROCK_AMMO_MAX ? "Rock pouch full" : "Press F or tap Pick Up to gather rocks");
+        animateRockSource(nearbyRockSource);
+
+        if (!input.consumePickup() || rockAmmo >= ROCK_AMMO_MAX) {
+            return;
+        }
+
+        const nextRockAmmo = Math.min(ROCK_AMMO_MAX, rockAmmo + 2);
+        setRockAmmo(nextRockAmmo);
+        audioSystem.playEquipGun();
+        notifyInventory();
+        onPromptChange(`Gathered rocks (${nextRockAmmo}/${ROCK_AMMO_MAX})`, { holdMs: 900 });
         return;
     }
 
@@ -145,12 +259,18 @@ function updatePickups({ playerController, audioSystem, pickups, input, inventor
 
     nearbyPickup.collected = true;
     nearbyPickup.mesh.setEnabled(false);
-    inventory.push({ id: nearbyPickup.id, label: nearbyPickup.label });
-    playerController.equipItem(nearbyPickup.id);
+
+    if (nearbyPickup.id === "rock") {
+        setRockAmmo(Math.min(ROCK_AMMO_MAX, getRockAmmo() + 1));
+    } else {
+        inventory.push({ id: nearbyPickup.id, label: nearbyPickup.label });
+        playerController.equipItem(nearbyPickup.id);
+    }
+
     audioSystem.playEquipGun();
-    onInventoryChange([...inventory]);
+    notifyInventory();
     input.setPickupAvailable(false);
-    onPromptChange(`Picked up ${nearbyPickup.label}`);
+    onPromptChange(nearbyPickup.id === "rock" ? `Picked up Rock (${getRockAmmo()}/${ROCK_AMMO_MAX})` : `Picked up ${nearbyPickup.label}`);
 }
 
 function animatePickup(pickup) {
@@ -158,6 +278,11 @@ function animatePickup(pickup) {
     pickup.gun.rotation.y += 0.025;
     pickup.gun.position.y = 0.35 + Math.sin(pickup.bobTime * PICKUP_BOB_SPEED) * 0.12;
     pickup.marker.rotation.y -= 0.018;
+}
+
+function animateRockSource(source) {
+    source.bobTime += 1 / 60;
+    source.mesh.rotation.y += 0.004;
 }
 
 function createPickupMarker(scene) {

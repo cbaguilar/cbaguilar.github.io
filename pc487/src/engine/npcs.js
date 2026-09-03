@@ -8,11 +8,28 @@ const WALK_CYCLE_SPEED = 5.5;
 const KNOCKBACK_DRAG = 4.2;
 const DEFEATED_DRAG = 1.8;
 const MOUNT_ENTER_DISTANCE = 4.8;
+const CHARGER_AGGRO_RANGE = 24;
+const CHARGER_HIT_RANGE = 1.55;
+const CHARGER_WINDUP_SECONDS = 0.72;
+const CHARGER_CHARGE_SECONDS = 0.58;
+const CHARGER_RECOVER_SECONDS = 0.9;
+const CHARGER_SPEED = 16;
 
-export function createNpcSystem({ scene, collisionWorld }) {
+export function createNpcSystem({ scene, collisionWorld, playerController }) {
     const rideInput = createRideInputState();
     let activeMount = null;
     const npcs = [
+        createNpc(scene, {
+            name: "npcMudZombie",
+            position: [-23, NPC_HALF_HEIGHT, 4],
+            rotation: 80,
+            shirt: [0.16, 0.34, 0.13],
+            wanderRadius: 2.8,
+            wanderSpeed: 0.85,
+            health: 70,
+            behavior: "charger",
+            modelFactory: createMudZombieHumanoid,
+        }),
         createNpc(scene, {
             name: "npcWarehouseWorker",
             position: [-8, NPC_HALF_HEIGHT, -7],
@@ -57,7 +74,7 @@ export function createNpcSystem({ scene, collisionWorld }) {
         const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
 
         for (const npc of npcs) {
-            updateNpc(npc, collisionWorld, rideInput, deltaSeconds);
+            updateNpc(npc, collisionWorld, rideInput, playerController, deltaSeconds);
         }
     });
 
@@ -144,9 +161,15 @@ function createNpc(scene, spec) {
         model,
         healthBar,
         origin: proxy.position.clone(),
-        health: NPC_MAX_HEALTH,
-        maxHealth: NPC_MAX_HEALTH,
+        health: spec.health ?? NPC_MAX_HEALTH,
+        maxHealth: spec.health ?? NPC_MAX_HEALTH,
         defeated: false,
+        behavior: spec.behavior ?? "wander",
+        behaviorState: {
+            phase: "idle",
+            timer: 0,
+            chargeDirection: new BABYLON.Vector3(),
+        },
         collisionRadius: spec.collisionRadius ?? NPC_COLLISION_RADIUS,
         targetYOffset: spec.targetYOffset ?? 0.85,
         mountable: Boolean(spec.mountable),
@@ -213,6 +236,20 @@ function createBlockHumanoid(scene, parent, spec) {
         leftLeg,
         rightLeg,
     };
+}
+
+function createMudZombieHumanoid(scene, parent, spec) {
+    const model = createBlockHumanoid(scene, parent, spec);
+    const eyeMaterial = makeMaterial(scene, `${spec.name}Eyes`, 0.95, 0.88, 0.22);
+    const mudMaterial = makeMaterial(scene, `${spec.name}Mud`, 0.22, 0.11, 0.05);
+
+    addBodyBox(scene, model.root, `${spec.name}LeftEye`, { width: 0.1, height: 0.08, depth: 0.04 }, [-0.14, 2, 0.27], eyeMaterial);
+    addBodyBox(scene, model.root, `${spec.name}RightEye`, { width: 0.1, height: 0.08, depth: 0.04 }, [0.14, 2, 0.27], eyeMaterial);
+    addBodyBox(scene, model.root, `${spec.name}MudMouth`, { width: 0.28, height: 0.06, depth: 0.04 }, [0, 1.8, 0.27], mudMaterial);
+    model.root.scaling.set(1.04, 0.96, 1.04);
+    model.leftArm.rotation.z = BABYLON.Tools.ToRadians(-8);
+    model.rightArm.rotation.z = BABYLON.Tools.ToRadians(8);
+    return model;
 }
 
 function createMountedOfficer(scene, parent, spec) {
@@ -360,7 +397,7 @@ function createLeg(scene, parent, name, position, pantsMaterial, shoeMaterial) {
     return legRoot;
 }
 
-function updateNpc(npc, collisionWorld, rideInput, deltaSeconds) {
+function updateNpc(npc, collisionWorld, rideInput, playerController, deltaSeconds) {
     if (npc.ridden) {
         updateMountedHorse(npc, collisionWorld, rideInput, deltaSeconds);
         return;
@@ -384,6 +421,11 @@ function updateNpc(npc, collisionWorld, rideInput, deltaSeconds) {
         integrateNpcVelocity(npc, collisionWorld, deltaSeconds, KNOCKBACK_DRAG);
         npc.walkTime += deltaSeconds * WALK_CYCLE_SPEED;
         animateHumanoid(npc.model, npc.walkTime, 0.15);
+        updateHealthBar(npc);
+        return;
+    }
+
+    if (npc.behavior === "charger" && updateChargingNpc(npc, collisionWorld, playerController, deltaSeconds)) {
         updateHealthBar(npc);
         return;
     }
@@ -416,6 +458,80 @@ function updateNpc(npc, collisionWorld, rideInput, deltaSeconds) {
     npc.walkTime += deltaSeconds * WALK_CYCLE_SPEED;
     animateHumanoid(npc.model, npc.walkTime, Math.min(speed * 12, 1));
     updateHealthBar(npc);
+}
+
+function updateChargingNpc(npc, collisionWorld, playerController, deltaSeconds) {
+    if (!playerController?.active || !playerController.controlsEnabled) {
+        npc.behaviorState.phase = "idle";
+        return false;
+    }
+
+    const toPlayer = playerController.mesh.position.subtract(npc.proxy.position);
+    toPlayer.y = 0;
+    const distanceToPlayer = toPlayer.length();
+
+    if (distanceToPlayer > CHARGER_AGGRO_RANGE && npc.behaviorState.phase === "idle") {
+        return false;
+    }
+
+    npc.behaviorState.timer = Math.max(0, npc.behaviorState.timer - deltaSeconds);
+
+    if (npc.behaviorState.phase === "idle") {
+        npc.behaviorState.phase = "windup";
+        npc.behaviorState.timer = CHARGER_WINDUP_SECONDS;
+        npc.behaviorState.chargeDirection.copyFrom(toPlayer.lengthSquared() > 0.001 ? toPlayer.normalize() : getForward(npc.proxy));
+    }
+
+    if (npc.behaviorState.phase === "windup") {
+        faceDirection(npc.proxy, toPlayer);
+        npc.walkTime += deltaSeconds * 12;
+        animateChargingWindup(npc);
+
+        if (npc.behaviorState.timer <= 0) {
+            npc.behaviorState.phase = "charge";
+            npc.behaviorState.timer = CHARGER_CHARGE_SECONDS;
+            npc.behaviorState.chargeDirection.copyFrom(toPlayer.lengthSquared() > 0.001 ? toPlayer.normalize() : getForward(npc.proxy));
+        }
+        return true;
+    }
+
+    if (npc.behaviorState.phase === "charge") {
+        const previousPosition = npc.proxy.position.clone();
+        const chargeDirection = npc.behaviorState.chargeDirection;
+        npc.proxy.position.x = clamp(npc.proxy.position.x + chargeDirection.x * CHARGER_SPEED * deltaSeconds, -86, 86);
+        npc.proxy.position.z = clamp(npc.proxy.position.z + chargeDirection.z * CHARGER_SPEED * deltaSeconds, -86, 86);
+        const resolvedPosition = collisionWorld.resolveCircleMovement(npc.proxy.position, previousPosition, npc.collisionRadius);
+        const collided = resolvedPosition.x !== npc.proxy.position.x || resolvedPosition.z !== npc.proxy.position.z;
+        npc.proxy.position.x = resolvedPosition.x;
+        npc.proxy.position.z = resolvedPosition.z;
+        npc.proxy.position.y = NPC_HALF_HEIGHT;
+        npc.proxy.rotation.y = Math.atan2(chargeDirection.x, chargeDirection.z);
+        npc.walkTime += deltaSeconds * 16;
+        animateHumanoid(npc.model, npc.walkTime, 1.35);
+
+        if (distanceToPlayer <= CHARGER_HIT_RANGE) {
+            applyImpulseToNpc(npc, chargeDirection.scale(-7));
+            npc.behaviorState.phase = "recover";
+            npc.behaviorState.timer = CHARGER_RECOVER_SECONDS;
+        } else if (collided || npc.behaviorState.timer <= 0) {
+            npc.behaviorState.phase = "recover";
+            npc.behaviorState.timer = CHARGER_RECOVER_SECONDS;
+        }
+        return true;
+    }
+
+    if (npc.behaviorState.phase === "recover") {
+        npc.walkTime += deltaSeconds * 4;
+        animateChargingRecover(npc);
+
+        if (npc.behaviorState.timer <= 0) {
+            npc.behaviorState.phase = distanceToPlayer <= CHARGER_AGGRO_RANGE ? "windup" : "idle";
+            npc.behaviorState.timer = npc.behaviorState.phase === "windup" ? CHARGER_WINDUP_SECONDS : 0;
+        }
+        return true;
+    }
+
+    return false;
 }
 
 function integrateNpcVelocity(npc, collisionWorld, deltaSeconds, drag) {
@@ -639,6 +755,14 @@ function getRight(mesh) {
     return new BABYLON.Vector3(Math.cos(mesh.rotation.y), 0, -Math.sin(mesh.rotation.y));
 }
 
+function faceDirection(mesh, direction) {
+    if (direction.lengthSquared() < 0.001) {
+        return;
+    }
+
+    mesh.rotation.y = Math.atan2(direction.x, direction.z);
+}
+
 function updateHealthBar(npc) {
     const healthRatio = npc.health / npc.maxHealth;
     npc.healthBar.fill.scaling.x = Math.max(0.001, healthRatio);
@@ -659,6 +783,26 @@ function animateHumanoid(model, walkTime, moveAmount) {
     model.rightArm.rotation.x = stride * 0.48;
     model.leftLeg.rotation.x = stride * 0.36;
     model.rightLeg.rotation.x = counterStride * 0.36;
+}
+
+function animateChargingWindup(npc) {
+    const wiggle = Math.sin(npc.walkTime * 1.8) * 0.16;
+    npc.model.root.position.y = -NPC_HALF_HEIGHT + Math.abs(Math.sin(npc.walkTime)) * 0.08;
+    npc.model.torso.rotation.x = BABYLON.Tools.ToRadians(-9);
+    npc.model.leftArm.rotation.x = BABYLON.Tools.ToRadians(-112) + wiggle;
+    npc.model.rightArm.rotation.x = BABYLON.Tools.ToRadians(-112) - wiggle;
+    npc.model.leftLeg.rotation.x = BABYLON.Tools.ToRadians(-8);
+    npc.model.rightLeg.rotation.x = BABYLON.Tools.ToRadians(8);
+}
+
+function animateChargingRecover(npc) {
+    const sag = Math.sin(npc.walkTime) * 0.05;
+    npc.model.root.position.y = -NPC_HALF_HEIGHT + sag;
+    npc.model.torso.rotation.x = BABYLON.Tools.ToRadians(14);
+    npc.model.leftArm.rotation.x = BABYLON.Tools.ToRadians(24);
+    npc.model.rightArm.rotation.x = BABYLON.Tools.ToRadians(24);
+    npc.model.leftLeg.rotation.x = BABYLON.Tools.ToRadians(-12);
+    npc.model.rightLeg.rotation.x = BABYLON.Tools.ToRadians(12);
 }
 
 function approach(value, target, amount) {

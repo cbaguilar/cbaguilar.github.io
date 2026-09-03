@@ -4,7 +4,11 @@ const PISTOL_COOLDOWN_SECONDS = 0.32;
 const STICK_DAMAGE = 18;
 const STICK_RANGE = 4.4;
 const STICK_COOLDOWN_SECONDS = 0.48;
+const ROCK_DAMAGE = 24;
+const ROCK_RANGE = 28;
+const ROCK_COOLDOWN_SECONDS = 0.62;
 const AIM_CONE_DOT = 0.94;
+const ROCK_CONE_DOT = 0.9;
 const MELEE_CONE_DOT = 0.56;
 
 export function createCombatSystem({ scene, playerController, vehicleController, itemSystem, npcSystem, audioSystem, onPromptChange }) {
@@ -67,6 +71,11 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
         return;
     }
 
+    if (weapon.id === "rock" && !itemSystem.consumeRock()) {
+        showCombatMessage(onPromptChange, state, "Find a boulder and gather rocks");
+        return;
+    }
+
     state.cooldown = weapon.cooldown;
     state.shotsFired += 1;
     const aimPoint = shootRequest.pointer
@@ -78,6 +87,8 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
 
     if (weapon.id === "pistol") {
         audioSystem.playGunshot();
+    } else if (weapon.id === "rock") {
+        audioSystem.playStickSwing();
     } else if (weapon.id === "stick") {
         audioSystem.playStickSwing();
     }
@@ -95,6 +106,11 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
             ? hit.npc.proxy.position.add(new BABYLON.Vector3(0, 0.9, 0))
             : shot.origin.add(shot.direction.scale(weapon.range));
         createTracer(scene, shot.origin, tracerEnd, Boolean(hit));
+    } else if (weapon.id === "rock") {
+        const projectileEnd = hit
+            ? hit.npc.proxy.position.add(new BABYLON.Vector3(0, 0.75, 0))
+            : shot.origin.add(shot.direction.scale(weapon.range));
+        createRockProjectile(scene, shot.origin, projectileEnd, Boolean(hit));
     } else {
         createStickSwing(scene, shot.origin, shot.direction, Boolean(hit));
     }
@@ -124,6 +140,16 @@ function getActiveWeapon(itemSystem) {
             range: PISTOL_RANGE,
             cooldown: PISTOL_COOLDOWN_SECONDS,
             minDot: AIM_CONE_DOT,
+        };
+    }
+
+    if (itemSystem.hasItem("rock")) {
+        return {
+            id: "rock",
+            damage: ROCK_DAMAGE,
+            range: ROCK_RANGE,
+            cooldown: ROCK_COOLDOWN_SECONDS,
+            minDot: ROCK_CONE_DOT,
         };
     }
 
@@ -296,6 +322,37 @@ function createStickSwing(scene, origin, direction, hit) {
         swing.dispose();
         material.dispose();
     }, 120);
+}
+
+function createRockProjectile(scene, start, end, hit) {
+    const rock = BABYLON.MeshBuilder.CreateSphere("thrownRockProjectile", {
+        diameter: hit ? 0.36 : 0.28,
+        segments: 7,
+    }, scene);
+    const material = new BABYLON.StandardMaterial("thrownRockMaterial", scene);
+    material.diffuseColor = hit
+        ? new BABYLON.Color3(0.48, 0.42, 0.34)
+        : new BABYLON.Color3(0.34, 0.33, 0.3);
+    material.specularColor = new BABYLON.Color3(0.035, 0.035, 0.035);
+    rock.material = material;
+    rock.position.copyFrom(start);
+
+    const durationMs = 340;
+    const arcHeight = Math.min(3.6, 1.1 + BABYLON.Vector3.Distance(start, end) * 0.08);
+    const startTime = performance.now();
+    const observer = scene.onBeforeRenderObservable.add(() => {
+        const progress = Math.min((performance.now() - startTime) / durationMs, 1);
+        BABYLON.Vector3.LerpToRef(start, end, progress, rock.position);
+        rock.position.y += Math.sin(progress * Math.PI) * arcHeight;
+        rock.rotation.x += 0.28;
+        rock.rotation.z += 0.18;
+
+        if (progress >= 1) {
+            scene.onBeforeRenderObservable.remove(observer);
+            rock.dispose();
+            material.dispose();
+        }
+    });
 }
 
 function showCombatMessage(onPromptChange, state, message) {

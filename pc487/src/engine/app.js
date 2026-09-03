@@ -129,6 +129,7 @@ export function createPc487App({ canvas }) {
         sceneState.combatSystem.dispose();
         sceneState.vehicleImpactSystem.dispose();
         sceneState.vehicleAudioController.dispose();
+        sceneState.traversalCourseController.dispose();
         sceneState.cameraRegionController.dispose();
         sceneState.npcSystem.dispose();
         sceneState.itemSystem.dispose();
@@ -202,6 +203,8 @@ function createScene(engine, canvas) {
         vehicleAudioController: null,
         cameraRegionController: null,
         collisionWorld: null,
+        traversalCourse: null,
+        traversalCourseController: null,
         dispose: null,
         roads: [],
         buildings: [],
@@ -210,11 +213,21 @@ function createScene(engine, canvas) {
     createFlatGround(scene);
     sceneState.roads = createRiverCorridor(scene);
     sceneState.buildings = createRiparianVegetation(scene);
+    sceneState.traversalCourse = createTraversalCourse(scene);
     sceneState.collisionWorld = createCollisionWorld(sceneState.buildings);
     sceneState.audioSystem = createAudioSystem();
-    sceneState.playerController = createPlayerController({ scene, camera, collisionWorld: sceneState.collisionWorld });
+    sceneState.playerController = createPlayerController({
+        scene,
+        camera,
+        collisionWorld: sceneState.collisionWorld,
+        terrainWorld: sceneState.traversalCourse,
+    });
     sceneState.vehicleController = createVehicleController({ scene, collisionWorld: sceneState.collisionWorld });
-    sceneState.npcSystem = createNpcSystem({ scene, collisionWorld: sceneState.collisionWorld });
+    sceneState.npcSystem = createNpcSystem({
+        scene,
+        collisionWorld: sceneState.collisionWorld,
+        playerController: sceneState.playerController,
+    });
     sceneState.itemSystem = createItemSystem({
         scene,
         playerController: sceneState.playerController,
@@ -247,6 +260,7 @@ function createScene(engine, canvas) {
         onPromptChange: updateInteractionPrompt,
     });
     sceneState.dispose = createInteractionController(sceneState);
+    sceneState.traversalCourseController = createTraversalCourseController(sceneState);
     sceneState.cameraRegionController = createCameraRegionController(sceneState);
 
     return sceneState;
@@ -398,6 +412,29 @@ function createVehicleAudioController(sceneState) {
     };
 }
 
+function createTraversalCourseController(sceneState) {
+    const observer = sceneState.scene.onBeforeRenderObservable.add(() => {
+        if (!sceneState.playerController.active || !sceneState.playerController.controlsEnabled) {
+            return;
+        }
+
+        const respawnPoint = sceneState.traversalCourse.getRespawnPointIfHazard(sceneState.playerController.mesh.position);
+
+        if (!respawnPoint) {
+            return;
+        }
+
+        sceneState.playerController.mesh.position.copyFrom(respawnPoint);
+        updateInteractionPrompt("Careful around the washout", { holdMs: 900 });
+    });
+
+    return {
+        dispose() {
+            sceneState.scene.onBeforeRenderObservable.remove(observer);
+        },
+    };
+}
+
 function createTestControls(sceneState) {
     return {
         grantPistol() {
@@ -413,6 +450,9 @@ function createTestControls(sceneState) {
                 sceneState.playerController.equipItem("stick");
                 updateInventoryHud(sceneState.itemSystem.inventory);
             }
+        },
+        grantRocks(amount = 5) {
+            sceneState.itemSystem.addRocks(amount);
         },
         enterVehicle() {
             sceneState.playerController.setActive(false);
@@ -747,6 +787,118 @@ function createRiparianVegetation(scene) {
     }
 
     return blockers;
+}
+
+function createTraversalCourse(scene) {
+    const platformMaterial = makeMaterial(scene, "traversalPackedDirt", 0.43, 0.34, 0.2);
+    const rampMaterial = makeMaterial(scene, "traversalRampDirt", 0.5, 0.41, 0.25);
+    const chasmMaterial = makeMaterial(scene, "traversalChasm", 0.035, 0.032, 0.03);
+    const edgeMaterial = makeMaterial(scene, "traversalEdge", 0.72, 0.62, 0.38);
+    const platforms = [
+        { minX: -44, maxX: -34, minZ: -10, maxZ: -3, height: 0.9 },
+        { minX: -33, maxX: -22, minZ: -11, maxZ: -2, height: 2.15 },
+        { minX: -30, maxX: -24, minZ: 2, maxZ: 11, height: 3.2 },
+    ];
+    const ramps = [
+        { minX: -52, maxX: -44, minZ: -10, maxZ: -3, fromHeight: 0, toHeight: 0.9 },
+        { minX: -38, maxX: -33, minZ: -11, maxZ: -2, fromHeight: 0.9, toHeight: 2.15 },
+        { minX: -27, maxX: -24, minZ: -2, maxZ: 2, fromHeight: 2.15, toHeight: 3.2, axis: "z" },
+    ];
+    const hazards = [
+        { minX: -34, maxX: -20, minZ: -1.8, maxZ: 1.9 },
+        { minX: -23.8, maxX: -19, minZ: 1.9, maxZ: 12 },
+    ];
+    const respawnPoint = new BABYLON.Vector3(-49, 1, -6.5);
+
+    for (const platform of platforms) {
+        addRaisedBox(scene, "traversalPlatform", platform, platformMaterial);
+    }
+
+    for (const ramp of ramps) {
+        addRamp(scene, ramp, rampMaterial);
+    }
+
+    for (const hazard of hazards) {
+        addHazard(scene, hazard, chasmMaterial, edgeMaterial);
+    }
+
+    return {
+        getHeightAt(position) {
+            for (const ramp of ramps) {
+                if (!pointInRect(position, ramp)) {
+                    continue;
+                }
+
+                const progress = ramp.axis === "z"
+                    ? (position.z - ramp.minZ) / (ramp.maxZ - ramp.minZ)
+                    : (position.x - ramp.minX) / (ramp.maxX - ramp.minX);
+                return ramp.fromHeight + (ramp.toHeight - ramp.fromHeight) * clamp(progress, 0, 1);
+            }
+
+            for (const platform of platforms) {
+                if (pointInRect(position, platform)) {
+                    return platform.height;
+                }
+            }
+
+            return 0;
+        },
+        getRespawnPointIfHazard(position) {
+            for (const hazard of hazards) {
+                if (pointInRect(position, hazard)) {
+                    return respawnPoint.clone();
+                }
+            }
+
+            return null;
+        },
+    };
+}
+
+function addRaisedBox(scene, name, spec, material) {
+    const height = spec.height;
+    const box = BABYLON.MeshBuilder.CreateBox(name, {
+        width: spec.maxX - spec.minX,
+        height,
+        depth: spec.maxZ - spec.minZ,
+    }, scene);
+    box.position.set((spec.minX + spec.maxX) / 2, height / 2, (spec.minZ + spec.maxZ) / 2);
+    box.material = material;
+    return box;
+}
+
+function addRamp(scene, spec, material) {
+    const box = BABYLON.MeshBuilder.CreateBox("traversalRamp", {
+        width: spec.maxX - spec.minX,
+        height: 0.18,
+        depth: spec.maxZ - spec.minZ,
+    }, scene);
+    box.position.set(
+        (spec.minX + spec.maxX) / 2,
+        (spec.fromHeight + spec.toHeight) / 2,
+        (spec.minZ + spec.maxZ) / 2,
+    );
+    box.rotation.z = spec.axis === "z" ? 0 : -Math.atan2(spec.toHeight - spec.fromHeight, spec.maxX - spec.minX);
+    box.rotation.x = spec.axis === "z" ? Math.atan2(spec.toHeight - spec.fromHeight, spec.maxZ - spec.minZ) : 0;
+    box.material = material;
+    return box;
+}
+
+function addHazard(scene, spec, chasmMaterial, edgeMaterial) {
+    addFlatBox(scene, "traversalChasm", {
+        width: spec.maxX - spec.minX,
+        depth: spec.maxZ - spec.minZ,
+    }, [(spec.minX + spec.maxX) / 2, 0.03, (spec.minZ + spec.maxZ) / 2], 0, chasmMaterial);
+
+    addFlatBox(scene, "traversalChasmEdge", { width: spec.maxX - spec.minX, depth: 0.28 }, [(spec.minX + spec.maxX) / 2, 0.08, spec.minZ], 0, edgeMaterial);
+    addFlatBox(scene, "traversalChasmEdge", { width: spec.maxX - spec.minX, depth: 0.28 }, [(spec.minX + spec.maxX) / 2, 0.08, spec.maxZ], 0, edgeMaterial);
+}
+
+function pointInRect(position, rect) {
+    return position.x >= rect.minX
+        && position.x <= rect.maxX
+        && position.z >= rect.minZ
+        && position.z <= rect.maxZ;
 }
 
 function createBrushWall(scene, wall, blockers, leafMaterial, scrubMaterial) {
