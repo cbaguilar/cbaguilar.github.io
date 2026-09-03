@@ -10,11 +10,11 @@ The next slice should teach one readable loop at a time:
 
 ## Useful References
 
-- The Level Design Book, enemy design: enemy types need readable silhouette, behavior, health, speed, damage, and range.
-- Game Developer, "Enemy Attacks and Telegraphing": attacks should include a clear pre-attack warning so damage feels fair.
-- The Level Design Book, combat: PvE combat should create delayed but reliable player victory, using mechanics like territory control, timing, traps, and weak points.
-- The Level Design Book, verticality: up/down movement gives players a strong sense of progression and orientation.
-- Game Developer, "Traversal Level Design Principles": traversal works best when layouts create readable movement goals and recovery space.
+- The Level Design Book, enemy design: enemy types need readable silhouette, behavior, health, speed, damage, and range. https://book.leveldesignbook.com/process/combat/enemy
+- Game Developer, "Enemy Attacks and Telegraphing": attacks should include a clear pre-attack warning so damage feels fair. https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing
+- The Level Design Book, combat: PvE combat should create delayed but reliable player victory, using mechanics like territory control, timing, traps, and weak points. https://book.leveldesignbook.com/process/combat
+- The Level Design Book, verticality: up/down movement gives players a strong sense of progression and orientation. https://book.leveldesignbook.com/process/layout/flow/verticality
+- The Level Design Book, encounter design: keep the first encounter readable by using a small enemy palette and clear preparation space. https://book.leveldesignbook.com/process/combat/encounter
 
 ## Prototype Targets
 
