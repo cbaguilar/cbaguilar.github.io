@@ -92,6 +92,26 @@ try {
 
     await cdp.send("Runtime.evaluate", {
         expression: `
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            window.__pc487.testControls.grantRocks(1);
+            window.__pc487.__shotsBefore = window.__pc487.testControls.shotsFired;
+            document.querySelector("#mobile-shoot").dispatchEvent(new PointerEvent("pointerdown", {
+                button: 0,
+                bubbles: true,
+                cancelable: true,
+                pointerType: "touch",
+            }));
+        `,
+        awaitPromise: true,
+    });
+    await waitForExpression(
+        cdp,
+        "window.__pc487.testControls.shotsFired > window.__pc487.__shotsBefore",
+        3000,
+    );
+
+    await cdp.send("Runtime.evaluate", {
+        expression: `
             await new Promise((resolve) => setTimeout(resolve, 350));
             window.__pc487.testControls.grantPistol();
             window.__pc487.testControls.enterVehicle();
