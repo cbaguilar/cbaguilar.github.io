@@ -10,6 +10,8 @@ const ROCK_COOLDOWN_SECONDS = 0.62;
 const AIM_CONE_DOT = 0.94;
 const ROCK_CONE_DOT = 0.9;
 const MELEE_CONE_DOT = 0.56;
+const PISTOL_AIM_ASSIST_RADIUS = 1.15;
+const ROCK_AIM_ASSIST_RADIUS = 1.85;
 
 export function createCombatSystem({ scene, playerController, vehicleController, itemSystem, npcSystem, audioSystem, onPromptChange }) {
     const input = createInputState(scene.getEngine().getRenderingCanvas());
@@ -81,7 +83,7 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
     const aimPoint = shootRequest.pointer
         ? getGroundAimPoint(scene, shootRequest.pointer.x, shootRequest.pointer.y)
         : null;
-    const shooter = getActiveShooter({ playerController, vehicleController, npcSystem, aimPoint });
+    const shooter = getActiveShooter({ scene, playerController, vehicleController, npcSystem, weapon, aimPoint });
 
     shooter.animate();
 
@@ -94,12 +96,19 @@ function updateCombat({ scene, playerController, vehicleController, itemSystem, 
     }
 
     const shot = shooter.getShotVector();
-    const hit = npcSystem.findTarget({
-        origin: shot.origin,
-        direction: shot.direction,
-        range: weapon.range,
-        minDot: weapon.minDot,
-    });
+    const hit = weapon.kind === "ranged"
+        ? npcSystem.findRangedTarget({
+            origin: shot.origin,
+            direction: shot.direction,
+            range: weapon.range,
+            maxMissDistance: weapon.aimAssistRadius,
+        })
+        : npcSystem.findTarget({
+            origin: shot.origin,
+            direction: shot.direction,
+            range: weapon.range,
+            minDot: weapon.minDot,
+        });
 
     if (weapon.id === "pistol") {
         const tracerEnd = hit
@@ -140,6 +149,8 @@ function getActiveWeapon(itemSystem) {
             range: PISTOL_RANGE,
             cooldown: PISTOL_COOLDOWN_SECONDS,
             minDot: AIM_CONE_DOT,
+            kind: "ranged",
+            aimAssistRadius: PISTOL_AIM_ASSIST_RADIUS,
         };
     }
 
@@ -150,6 +161,8 @@ function getActiveWeapon(itemSystem) {
             range: ROCK_RANGE,
             cooldown: ROCK_COOLDOWN_SECONDS,
             minDot: ROCK_CONE_DOT,
+            kind: "ranged",
+            aimAssistRadius: ROCK_AIM_ASSIST_RADIUS,
         };
     }
 
@@ -160,28 +173,34 @@ function getActiveWeapon(itemSystem) {
             range: STICK_RANGE,
             cooldown: STICK_COOLDOWN_SECONDS,
             minDot: MELEE_CONE_DOT,
+            kind: "melee",
         };
     }
 
     return null;
 }
 
-function getActiveShooter({ playerController, vehicleController, npcSystem, aimPoint }) {
+function getActiveShooter({ scene, playerController, vehicleController, npcSystem, weapon, aimPoint }) {
     if (playerController.active) {
         if (aimPoint) {
             playerController.facePoint(aimPoint);
         }
+
+        let origin = weapon.id === "rock"
+            ? playerController.getThrowPosition()
+            : playerController.getMuzzlePosition();
+        const direction = getPlayerAimDirection({ scene, playerController, origin, aimPoint, weapon });
+        playerController.facePoint(origin.add(direction));
+        origin = weapon.id === "rock"
+            ? playerController.getThrowPosition()
+            : playerController.getMuzzlePosition();
 
         return {
             animate() {
                 playerController.playShootAnimation();
             },
             getShotVector() {
-                return getShotVectorFromMesh({
-                    mesh: playerController.mesh,
-                    origin: playerController.getMuzzlePosition(),
-                    aimPoint,
-                });
+                return { origin, direction };
             },
         };
     }
@@ -221,11 +240,31 @@ function getActiveShooter({ playerController, vehicleController, npcSystem, aimP
         getShotVector() {
             return getShotVectorFromMesh({
                 mesh: playerController.mesh,
-                origin: playerController.getMuzzlePosition(),
+                origin: weapon.id === "rock" ? playerController.getThrowPosition() : playerController.getMuzzlePosition(),
                 aimPoint,
             });
         },
     };
+}
+
+function getPlayerAimDirection({ scene, playerController, origin, aimPoint, weapon }) {
+    if (aimPoint) {
+        return getShotVectorFromAimPoint({ mesh: playerController.mesh, origin, aimPoint }).direction;
+    }
+
+    if (weapon.kind !== "ranged") {
+        return getForward(playerController.mesh);
+    }
+
+    const cameraForward = scene.activeCamera?.getForwardRay().direction.clone();
+
+    if (!cameraForward || cameraForward.lengthSquared() < 0.0001) {
+        return getForward(playerController.mesh);
+    }
+
+    cameraForward.y *= 0.35;
+    cameraForward.normalize();
+    return cameraForward;
 }
 
 function getGroundAimPoint(scene, screenX, screenY) {
@@ -245,10 +284,24 @@ function getGroundAimPoint(scene, screenX, screenY) {
 }
 
 function getShotVectorFromMesh({ mesh, origin, aimPoint }) {
+    if (aimPoint) {
+        return getShotVectorFromAimPoint({ mesh, origin, aimPoint });
+    }
+
+    return {
+        origin,
+        direction: getForward(mesh),
+    };
+}
+
+function getShotVectorFromAimPoint({ mesh, origin, aimPoint }) {
     const direction = aimPoint
         ? aimPoint.subtract(origin)
         : getForward(mesh);
-    direction.y = 0;
+
+    if (Math.abs(direction.y) > 0.001) {
+        direction.y *= 0.35;
+    }
 
     if (direction.lengthSquared() < 0.0001) {
         direction.copyFrom(getForward(mesh));

@@ -122,6 +122,9 @@ export function createNpcSystem({ scene, collisionWorld, playerController }) {
         findTarget({ origin, direction, range, minDot }) {
             return findNpcTarget({ npcs, origin, direction, range, minDot });
         },
+        findRangedTarget({ origin, direction, range, maxMissDistance }) {
+            return findRangedNpcTarget({ npcs, origin, direction, range, maxMissDistance });
+        },
         damageNpc(npc, damage) {
             return damageNpc(npc, damage);
         },
@@ -708,6 +711,41 @@ function findNpcTarget({ npcs, origin, direction, range, minDot }) {
                 npc,
                 distance,
                 aimDot,
+            };
+        }
+    }
+
+    return bestHit;
+}
+
+function findRangedNpcTarget({ npcs, origin, direction, range, maxMissDistance }) {
+    let bestHit = null;
+
+    for (const npc of npcs) {
+        if (npc.defeated) {
+            continue;
+        }
+
+        const target = npc.proxy.position.add(new BABYLON.Vector3(0, npc.targetYOffset, 0));
+        const toTarget = target.subtract(origin);
+        const alongRay = BABYLON.Vector3.Dot(toTarget, direction);
+
+        if (alongRay < 0 || alongRay > range) {
+            continue;
+        }
+
+        const closestPoint = origin.add(direction.scale(alongRay));
+        const missDistance = BABYLON.Vector3.Distance(target, closestPoint);
+
+        if (missDistance > maxMissDistance) {
+            continue;
+        }
+
+        if (!bestHit || missDistance < bestHit.missDistance || (missDistance === bestHit.missDistance && alongRay < bestHit.distance)) {
+            bestHit = {
+                npc,
+                distance: alongRay,
+                missDistance,
             };
         }
     }

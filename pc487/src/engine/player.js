@@ -44,6 +44,9 @@ export function createPlayerController({ scene, camera, collisionWorld, terrainW
         getMuzzlePosition() {
             return getMuzzlePosition(mesh);
         },
+        getThrowPosition() {
+            return getHandPosition(mesh);
+        },
         facePoint(point) {
             facePoint(mesh, point);
         },
@@ -89,12 +92,25 @@ function getMuzzlePosition(playerMesh) {
     const forward = new BABYLON.Vector3(Math.sin(playerMesh.rotation.y), 0, Math.cos(playerMesh.rotation.y));
 
     if (!playerModel?.equippedMesh) {
-        return playerMesh.position.add(new BABYLON.Vector3(0, 1.15, 0)).add(forward.scale(0.8));
+        return getHandPosition(playerMesh).add(forward.scale(0.35));
     }
 
     const muzzlePosition = playerModel.equippedMesh.getAbsolutePosition().add(forward.scale(0.55));
     muzzlePosition.y += 0.05;
     return muzzlePosition;
+}
+
+function getHandPosition(playerMesh) {
+    const playerModel = playerMesh.metadata;
+    const forward = new BABYLON.Vector3(Math.sin(playerMesh.rotation.y), 0, Math.cos(playerMesh.rotation.y));
+
+    if (playerModel?.rightHandSocket) {
+        const handPosition = playerModel.rightHandSocket.getAbsolutePosition().add(forward.scale(0.24));
+        handPosition.y += 0.1;
+        return handPosition;
+    }
+
+    return playerMesh.position.add(new BABYLON.Vector3(0, 1.1, 0)).add(forward.scale(0.45));
 }
 
 async function loadPlayerModel(scene, proxyMesh) {
